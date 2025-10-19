@@ -318,6 +318,74 @@ Implementation notes for Phase 1:
 - Wire request IDs through orchestrator → agents; include in logs/metrics/traces.
 - Wrap all outbound calls with timeouts and retries; add circuit breaker at orchestrator boundary.
 
+### Architecture: Stateless Services & Horizontal Scaling
+- [ ] Run multiple API/orchestrator instances behind a load balancer
+- [ ] Ensure `BaseAgent` and `OrchestratorAgent` remain stateless
+- [ ] Externalize all stateful concerns to dedicated services (context, caches, DBs)
+- [ ] Document autoscaling policies (CPU, memory, p95 latency triggers)
+
+### State & Context Externalization
+- [ ] Store conversational context and sessions in Redis
+- [ ] Persist durable knowledge and admin data in Postgres
+- [ ] Use typed `ContextStore` methods to ensure schema stability
+- [ ] Add TTL for ephemeral keys; cleanup policies for stale sessions
+
+### Async Orchestration & Queues
+- [ ] Prefer async I/O throughout agents and orchestrator
+- [ ] Introduce a queue (Redis Streams/RabbitMQ) for long-running or fan-out tasks
+- [ ] Define idempotency keys and deduplication strategy for queued work
+- [ ] Implement saga/compensation hooks for multi-step operations
+
+### Resilience & Fault Tolerance
+- [ ] Timeouts and retry with jitter for all outbound calls
+- [ ] Circuit breakers per dependency (LLM, DB, vector store)
+- [ ] Bulkheads: isolate resource pools per agent type where feasible
+- [ ] Backpressure: shed load gracefully when saturated
+- [ ] Fallback responses for degraded modes in orchestrator
+
+### Caching Strategy
+- [ ] Cache syllabus/policy lookups in Redis with sensible TTLs
+- [ ] Cache LLM intermediate results where deterministic (e.g., tool schemas)
+- [ ] Cache embeddings or retrieval results for hot queries
+- [ ] Define cache invalidation rules tied to content versioning
+
+### Model/Provider Abstraction
+- [ ] Implement `LLMProvider` interface and one concrete provider to start
+- [ ] Centralize model selection, safety settings, and cost/latency policies
+- [ ] Support provider failover and feature flags for rollout/shadowing
+
+### Observability
+- [ ] Structured logging with request/correlation IDs
+- [ ] Metrics: latency, error rate, token usage, queue depth, cache hit rate
+- [ ] Tracing: per-request spans across orchestrator and agents (OpenTelemetry)
+- [ ] Dashboards and alerts for SLOs (p95 latency, error budgets)
+
+### API Safety & Governance
+- [ ] Rate limiting and quotas per user/tenant
+- [ ] Schema versioning for Pydantic request/response models
+- [ ] Input validation and sanitization on all entry points
+- [ ] Audit logs for administrative actions
+
+### Multi-Tenancy
+- [ ] Propagate tenant IDs through context and storage layers
+- [ ] Choose partitioning: schema-per-tenant or row-level with RLS
+- [ ] Isolate rate limits and quotas per tenant
+- [ ] Optional: per-tenant encryption keys and data residency constraints
+
+### Delivery & Infrastructure
+- [ ] Containerize services; pin base images and dependencies
+- [ ] Use Gunicorn + Uvicorn workers; tune worker count per CPU
+- [ ] Define health checks, readiness, and liveness probes
+- [ ] CI/CD with canary/shadow deployments via feature flags
+
+### Minimal Phase 1 Adjustments (Do Now)
+- [ ] Define strict Pydantic models for all agent I/O
+- [ ] Add correlation/request IDs and wire through logs/traces
+- [ ] Wrap LLM calls with timeouts/retries via `LLMProvider`
+- [ ] Keep agent methods pure/async; side effects via `ContextStore`
+- [ ] Add basic rate limiting middleware and per-user quotas
+- [ ] Prepare a small vector store for retrieval (pgvector/Qdrant)
+
 ## Next Phase Preparation
 
 ### Phase 2 Readiness
