@@ -9,10 +9,11 @@ wheels/
 # Virtual environments
 .venv
 
-# GOAL
+# Plan
 # GOAL.md
 # DISCUSSION_TOPICS.md
 # MULTI_AGENT_ARCHITECTURE.md
 # PHASE_1_IMPLEMENTATION.md
 # PHASE_1_DETAILED_PLAN.md
 # LLM_INTEGRATION_CHANGES.md
+Multi-Agent Educational System Design Plan.pdf
