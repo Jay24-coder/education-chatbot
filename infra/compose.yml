@@ -1,0 +1,14 @@
+# Local dev: Education Chatbot API (Phase 1).
+# Run from repo root: docker compose -f infra/compose.yml up
+# Build context is repo root; .env is loaded from repo root.
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - ../.env
+    environment:
+      - APP_ENV=development
