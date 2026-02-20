@@ -29,7 +29,7 @@ DEFAULT_FALLBACK_MESSAGE = (
 
 # Keyword rules for rule-based intent classification (order can matter for overlap)
 _INTENT_KEYWORDS: list[tuple[Intent, list[str]]] = [
-    (Intent.SYLLABUS, ["syllabus", "curriculum", "course outline", "prerequisites", "topics covered", "course info"]),
+    (Intent.SYLLABUS, ["syllabus", "curriculum", "course outline", "prerequisites", "topics covered", "topics are covered", "covered in the course", "course info"]),
     (Intent.ADMIN, ["deadline", "policy", "administration", "procedure", "submit", "assignment due", "grades", "attendance"]),
     (Intent.TOPIC, ["explain", "concept", "topic", "what is", "how does", "definition", "example", "related to"]),
 ]
