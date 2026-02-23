@@ -58,10 +58,10 @@ This document outlines the comprehensive multi-agent system architecture designe
                       │                 │
 ┌─────────────────────▼─────────────────▼─────────────────────┐
 │              SHARED SERVICES LAYER                          │
-│  • Context Manager (Student State, History)                │
-│  • Knowledge Base (Curriculum, Problems, Solutions)        │
-│  • Faculty Notification System                             │
-│  • Performance Analytics & Reporting                       │
+│  • Context Manager (Student State, History)                 │
+│  • Knowledge Base (Curriculum, Problems, Solutions)         │
+│  • Faculty Notification System                              │
+│  • Performance Analytics & Reporting                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
