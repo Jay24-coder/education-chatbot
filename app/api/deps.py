@@ -6,11 +6,15 @@ from typing import TYPE_CHECKING
 from app.config.settings import settings
 from app.orchestrator.context_manager import ContextManager
 from app.orchestrator.orchestrator_agent import OrchestratorAgent
+from app.orchestrator.registry import AgentRegistry
 from app.orchestrator.tracing import NoOpTracer
+from app.orchestrator.types import Intent
 from app.orchestrator.wiring import build_agent_registry
 from app.services.context.memory_store import MemoryStore
 
 if TYPE_CHECKING:
+    from app.agents.assessment.concept_test_agent import ConceptTestAgent
+    from app.agents.monitoring.performance_monitor_agent import PerformanceMonitorAgent
     from app.services.context.store import ContextStore
     from app.services.llm.provider import LLMProvider
 
@@ -37,15 +41,39 @@ def get_context_manager() -> ContextManager:
 
 
 @lru_cache(maxsize=1)
+def get_agent_registry() -> AgentRegistry:
+    """Return the shared agent registry (quiz, concept test, performance when context_store is set)."""
+    return build_agent_registry(
+        llm_provider=get_llm_provider(),
+        context_store=get_context_store(),
+    )
+
+
+@lru_cache(maxsize=1)
 def get_orchestrator() -> OrchestratorAgent:
     """Return the OrchestratorAgent with registry, store, tracer, and context manager wired."""
     store = get_context_store()
     context_manager = get_context_manager()
     tracer = NoOpTracer()
-    registry = build_agent_registry(llm_provider=get_llm_provider())
+    registry = get_agent_registry()
     return OrchestratorAgent(
         registry=registry,
         context_store=store,
         tracer=tracer,
         context_manager=context_manager,
     )
+
+
+def get_quiz_agent():
+    """Return QuizAgent from registry for assessment router; None if not registered."""
+    return get_agent_registry().get_agent(Intent.QUIZ)
+
+
+def get_concept_test_agent():
+    """Return ConceptTestAgent from registry for assessment router; None if not registered."""
+    return get_agent_registry().get_agent(Intent.CONCEPT_TEST)
+
+
+def get_performance_monitor():
+    """Return PerformanceMonitorAgent from registry for assessment router; None if not registered."""
+    return get_agent_registry().get_agent(Intent.PERFORMANCE)

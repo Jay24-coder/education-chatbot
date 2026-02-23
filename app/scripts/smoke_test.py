@@ -1,4 +1,4 @@
-"""Smoke test: hit health and chat endpoints to verify the API is up."""
+"""Smoke test: hit health, chat, and Phase 2 assessment endpoints to verify the API is up."""
 
 import sys
 
@@ -34,10 +34,45 @@ def main() -> None:
         else:
             print("OK /chat (response or expected error)")
 
+        # Phase 2: quiz flow (start + one answer)
+        r = client.post(
+            f"{BASE}/assessment/quiz/start",
+            json={"session_id": "smoke-s1", "user_id": "smoke-u1", "topic": "algebra", "difficulty": "beginner"},
+        )
+        if r.status_code != 200:
+            print(f"FAIL /assessment/quiz/start -> {r.status_code}")
+            ok = False
+        else:
+            print("OK /assessment/quiz/start")
+            r2 = client.post(
+                f"{BASE}/assessment/quiz/answer",
+                json={"session_id": "smoke-s1", "user_id": "smoke-u1", "answer": "5"},
+            )
+            if r2.status_code != 200:
+                print(f"FAIL /assessment/quiz/answer -> {r2.status_code}")
+                ok = False
+            else:
+                print("OK /assessment/quiz/answer")
+
+        # Phase 2: concept-test start (may 503 if no LLM)
+        r = client.post(
+            f"{BASE}/assessment/concept-test/start",
+            json={"session_id": "smoke-ct1", "user_id": "smoke-u1", "topic": "algebra"},
+        )
+        if r.status_code not in (200, 503):
+            print(f"FAIL /assessment/concept-test/start -> {r.status_code}")
+            ok = False
+        else:
+            print("OK /assessment/concept-test/start (200 or 503 when no LLM)")
+
+        # Phase 2: performance summary
+        r = client.get(f"{BASE}/assessment/performance/smoke-u1")
+        if r.status_code != 200:
+            print(f"FAIL /assessment/performance/{{user_id}} -> {r.status_code}")
+            ok = False
+        else:
+            print("OK /assessment/performance/{user_id}")
+
     if not ok:
         sys.exit(1)
     print("Smoke test passed.")
-
-
-if __name__ == "__main__":
-    main()

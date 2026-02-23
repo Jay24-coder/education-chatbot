@@ -97,3 +97,31 @@ class TestChatEndpoint:
     def test_chat_missing_message_returns_422(self, client: TestClient):
         r = client.post("/api/v1/chat", json={})
         assert r.status_code == 422
+
+    def test_chat_quiz_intent_routes_to_quiz_agent(self, client: TestClient):
+        """7.4: POST /api/v1/chat with quiz-intent message; assert Orchestrator routes to Quiz Agent."""
+        r = client.post(
+            "/api/v1/chat",
+            json={"message": "I want to start a quiz on algebra", "session_id": "sess-quiz-route"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("success") is True
+        assert "content" in data
+        # Quiz agent responds with first question or quiz started
+        assert "quiz" in data["content"].lower() or "question" in data["content"].lower()
+        assert "algebra" in data["content"].lower() or "Question 1 of" in data["content"]
+
+    def test_chat_concept_test_intent_routes_to_concept_test_agent(self, client: TestClient):
+        """7.4: POST /api/v1/chat with concept-test intent; assert routing to Concept Test agent."""
+        r = client.post(
+            "/api/v1/chat",
+            json={"message": "Start a concept test on calculus", "session_id": "sess-ct-route"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("success") is True
+        assert "content" in data
+        # Without LLM: "not available"; with LLM or mock: concept test started or first question
+        content_lower = data["content"].lower()
+        assert "concept test" in content_lower or "not available" in content_lower or "question" in data["content"]

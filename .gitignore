@@ -17,3 +17,8 @@ wheels/
 # PHASE_1_DETAILED_PLAN.md
 # LLM_INTEGRATION_CHANGES.md
 Multi-Agent Educational System Design Plan.pdf
+*.docx
+*.docx#
+
+# Environment variables
+.env

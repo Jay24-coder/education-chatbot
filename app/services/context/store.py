@@ -33,3 +33,26 @@ class ContextStore(Protocol):
     def delete(self, session_id: str, key: str | None = None) -> None:
         """Delete a key or the entire session if key is None."""
         ...
+
+    # --- Performance / assessment metrics (Phase 2) ---
+
+    def append_assessment_result(self, user_id: str, result: dict[str, Any]) -> None:
+        """
+        Append an assessment result for a user. Result must include 'type': 'quiz' or 'concept_test';
+        typically also topic, score, timestamp, session_id, metadata.
+        """
+        ...
+
+    def get_performance_summary(self, user_id: str) -> dict[str, Any]:
+        """
+        Get the performance summary for a user: avg_score, weak_topics, strong_topics, alert_flag.
+        Returns default summary dict if user has no data.
+        """
+        ...
+
+    def update_summary(self, user_id: str) -> None:
+        """
+        Recompute and persist the performance summary for a user from their metrics
+        (e.g. avg_score, weak/strong topics, alert_flag from recent results).
+        """
+        ...

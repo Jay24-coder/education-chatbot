@@ -6,12 +6,28 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class AssessmentResult(BaseModel):
+    """Result of a quiz or concept test for performance logging."""
+
+    user_id: str = Field(..., description="User identifier")
+    session_id: str | None = Field(default=None, description="Session when assessment was taken")
+    type: str = Field(..., description="Assessment type: 'quiz' or 'concept_test'")
+    topic: str = Field(default="", description="Topic or subject area")
+    score: float = Field(..., ge=0.0, le=1.0, description="Normalized score 0–1")
+    timestamp: str | None = Field(default=None, description="When the assessment was completed")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Optional extra data")
+
+
 class Intent(str, Enum):
     """Classified intent for routing to the appropriate agent."""
 
     SYLLABUS = "syllabus"
     ADMIN = "admin"
     TOPIC = "topic"
+    QUIZ = "quiz"
+    CONCEPT_TEST = "concept_test"
+    ASSESSMENT = "assessment"
+    PERFORMANCE = "performance"
     UNKNOWN = "unknown"
 
 
@@ -40,5 +56,8 @@ class AgentResponse(BaseModel):
     content: str = Field(..., description="Agent response content")
     agent_id: str = Field(..., description="ID of the agent that produced the response")
     success: bool = True
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Optional keys for assessment: result_type, score, topic",
+    )
     error_message: str | None = None

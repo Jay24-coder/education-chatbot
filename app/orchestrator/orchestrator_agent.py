@@ -32,6 +32,9 @@ _INTENT_KEYWORDS: list[tuple[Intent, list[str]]] = [
     (Intent.SYLLABUS, ["syllabus", "curriculum", "course outline", "prerequisites", "topics covered", "topics are covered", "covered in the course", "course info"]),
     (Intent.ADMIN, ["deadline", "policy", "administration", "procedure", "submit", "assignment due", "grades", "attendance"]),
     (Intent.TOPIC, ["explain", "concept", "topic", "what is", "how does", "definition", "example", "related to"]),
+    (Intent.PERFORMANCE, ["progress", "my progress", "show my progress", "performance", "how am i doing", "my scores", "assessment results"]),
+    (Intent.QUIZ, ["quiz", "start a quiz", "take a quiz", "give me a quiz", "quiz on", "start quiz"]),
+    (Intent.CONCEPT_TEST, ["concept test", "test my understanding", "concept test on", "start concept test"]),
 ]
 
 

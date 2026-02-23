@@ -1,0 +1,208 @@
+"""Assessment API: quiz start/answer, concept test start/answer, performance summary."""
+
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.deps import get_concept_test_agent, get_performance_monitor, get_quiz_agent
+from app.api.schemas.v1.assessment import (
+    ConceptTestResponse,
+    ConceptTestStartRequest,
+    ConceptTestTurnRequest,
+    PerformanceSummaryResponse,
+    QuizAnswerRequest,
+    QuizResponse,
+    QuizStartRequest,
+)
+from app.orchestrator.types import AgentRequest, Intent
+
+if TYPE_CHECKING:
+    from app.agents.assessment.concept_test_agent import ConceptTestAgent
+    from app.agents.assessment.quiz_agent import QuizAgent
+    from app.agents.monitoring.performance_monitor_agent import PerformanceMonitorAgent
+
+router = APIRouter(prefix="/assessment", tags=["assessment"])
+
+
+def _context(user_id: str | None, session_id: str) -> dict:
+    out: dict = {}
+    if user_id:
+        out["user_id"] = user_id
+    return out
+
+
+def _raise_for_quiz_failure(content: str, success: bool) -> None:
+    if success:
+        return
+    if "no quiz in progress" in content.lower():
+        raise HTTPException(status_code=404, detail=content)  # QuizNotFoundError
+    if "no quiz to finalize" in content.lower():
+        raise HTTPException(status_code=409, detail=content)  # TestAlreadyCompleteError
+    if "no questions available" in content.lower():
+        raise HTTPException(status_code=404, detail=content)
+    raise HTTPException(status_code=400, detail=content or "Quiz request failed")
+
+
+def _raise_for_concept_test_failure(content: str, success: bool) -> None:
+    if success:
+        return
+    if "no concept test in progress" in content.lower():
+        raise HTTPException(status_code=404, detail=content)  # QuizNotFoundError
+    if "no concept test to finalize" in content.lower():
+        raise HTTPException(status_code=409, detail=content)  # TestAlreadyCompleteError
+    if "not available" in content.lower() and "llm" in content.lower():
+        raise HTTPException(status_code=503, detail=content)
+    raise HTTPException(status_code=400, detail=content or "Concept test request failed")
+
+
+@router.post(
+    "/quiz/start",
+    response_model=QuizResponse,
+    responses={
+        400: {"description": "Invalid request or session"},
+        404: {"description": "Quiz not available"},
+        503: {"description": "Assessment service unavailable"},
+    },
+)
+async def quiz_start(
+    body: QuizStartRequest,
+    quiz_agent: "QuizAgent | None" = Depends(get_quiz_agent),
+) -> QuizResponse:
+    """Start a new quiz. Requires session_id; optional topic and difficulty."""
+    if not body.session_id or not body.session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id is required")
+    if quiz_agent is None:
+        raise HTTPException(status_code=503, detail="Assessment service unavailable")
+    message_parts = ["start quiz"]
+    if body.topic:
+        message_parts.append(body.topic)
+    if body.difficulty:
+        message_parts.append(body.difficulty)
+    message = " ".join(message_parts)
+    context = _context(body.user_id, body.session_id)
+    response = await quiz_agent.start_quiz(body.session_id, message, context)
+    _raise_for_quiz_failure(response.content, response.success)
+    return QuizResponse(
+        content=response.content,
+        success=response.success,
+        metadata=response.metadata,
+        completed=response.metadata.get("result_type") == "quiz",
+    )
+
+
+@router.post(
+    "/quiz/answer",
+    response_model=QuizResponse,
+    responses={
+        400: {"description": "Invalid request or session"},
+        404: {"description": "No quiz in progress"},
+        409: {"description": "Quiz already complete"},
+        503: {"description": "Assessment service unavailable"},
+    },
+)
+async def quiz_answer(
+    body: QuizAnswerRequest,
+    quiz_agent: "QuizAgent | None" = Depends(get_quiz_agent),
+) -> QuizResponse:
+    """Submit an answer for the current quiz question."""
+    if not body.session_id or not body.session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id is required")
+    if quiz_agent is None:
+        raise HTTPException(status_code=503, detail="Assessment service unavailable")
+    context = _context(body.user_id, body.session_id)
+    response = await quiz_agent.submit_answer(body.session_id, body.answer, context)
+    _raise_for_quiz_failure(response.content, response.success)
+    return QuizResponse(
+        content=response.content,
+        success=response.success,
+        metadata=response.metadata,
+        completed=response.metadata.get("result_type") == "quiz",
+    )
+
+
+@router.post(
+    "/concept-test/start",
+    response_model=ConceptTestResponse,
+    responses={
+        400: {"description": "Invalid request or session"},
+        503: {"description": "Concept test not available (LLM required)"},
+    },
+)
+async def concept_test_start(
+    body: ConceptTestStartRequest,
+    concept_test_agent: "ConceptTestAgent | None" = Depends(get_concept_test_agent),
+) -> ConceptTestResponse:
+    """Start a new concept test. Requires session_id; optional topic."""
+    if not body.session_id or not body.session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id is required")
+    if concept_test_agent is None:
+        raise HTTPException(status_code=503, detail="Assessment service unavailable")
+    message = f"concept test on {body.topic}" if body.topic else "start concept test"
+    context = _context(body.user_id, body.session_id)
+    response = await concept_test_agent.start_concept_test(body.session_id, message, context)
+    _raise_for_concept_test_failure(response.content, response.success)
+    return ConceptTestResponse(
+        content=response.content,
+        success=response.success,
+        metadata=response.metadata,
+        completed=response.metadata.get("result_type") == "concept_test",
+    )
+
+
+@router.post(
+    "/concept-test/answer",
+    response_model=ConceptTestResponse,
+    responses={
+        400: {"description": "Invalid request or session"},
+        404: {"description": "No concept test in progress"},
+        409: {"description": "Concept test already complete"},
+        503: {"description": "Assessment service unavailable"},
+    },
+)
+async def concept_test_answer(
+    body: ConceptTestTurnRequest,
+    concept_test_agent: "ConceptTestAgent | None" = Depends(get_concept_test_agent),
+) -> ConceptTestResponse:
+    """Submit an answer for the current concept test question, or send 'done' to finalize."""
+    if not body.session_id or not body.session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id is required")
+    if concept_test_agent is None:
+        raise HTTPException(status_code=503, detail="Assessment service unavailable")
+    context = _context(body.user_id, body.session_id)
+    request = AgentRequest(
+        message=body.answer,
+        session_id=body.session_id,
+        intent=Intent.CONCEPT_TEST,
+        context=context,
+    )
+    response = await concept_test_agent.process_request(request)
+    _raise_for_concept_test_failure(response.content, response.success)
+    return ConceptTestResponse(
+        content=response.content,
+        success=response.success,
+        metadata=response.metadata,
+        completed=response.metadata.get("result_type") == "concept_test",
+    )
+
+
+@router.get(
+    "/performance/{user_id}",
+    response_model=PerformanceSummaryResponse,
+    responses={400: {"description": "Invalid user_id"}},
+)
+async def get_performance(
+    user_id: str,
+    performance_monitor: "PerformanceMonitorAgent | None" = Depends(get_performance_monitor),
+) -> PerformanceSummaryResponse:
+    """Get performance summary for a user (avg score, weak/strong topics, alert flag)."""
+    if not user_id or not user_id.strip():
+        raise HTTPException(status_code=400, detail="user_id is required")
+    if performance_monitor is None:
+        raise HTTPException(status_code=503, detail="Performance service unavailable")
+    summary = performance_monitor.get_summary(user_id)
+    return PerformanceSummaryResponse(
+        avg_score=summary.get("avg_score", 0.0),
+        weak_topics=summary.get("weak_topics") or [],
+        strong_topics=summary.get("strong_topics") or [],
+        alert_flag=summary.get("alert_flag", False),
+    )

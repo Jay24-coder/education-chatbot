@@ -50,3 +50,21 @@ class TimeoutError(EducationError):
     """Error raised when an operation times out."""
 
     pass
+
+
+class QuizNotFoundError(EducationError):
+    """Raised when no quiz is in progress for the given session."""
+
+    pass
+
+
+class TestAlreadyCompleteError(EducationError):
+    """Raised when an assessment has already been completed/finalized."""
+
+    pass
+
+
+class InvalidSessionError(EducationError):
+    """Raised when session_id is missing or invalid for the operation."""
+
+    pass

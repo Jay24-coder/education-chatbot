@@ -53,6 +53,53 @@ class TestMemoryStore:
         assert memory_store.get("s1") == {}
         assert memory_store.get_history("s1") == []
 
+    # --- Performance / assessment metrics (Phase 2 Step 1) ---
+
+    def test_append_assessment_result_quiz_accumulates(self, memory_store: MemoryStore):
+        memory_store.append_assessment_result("u1", {"type": "quiz", "topic": "algebra", "score": 0.8})
+        memory_store.append_assessment_result("u1", {"type": "quiz", "topic": "calculus", "score": 0.6})
+        memory_store.update_summary("u1")
+        summary = memory_store.get_performance_summary("u1")
+        assert summary["avg_score"] == 0.7
+        assert "algebra" in summary["strong_topics"]
+        assert "calculus" not in summary["weak_topics"] and "calculus" not in summary["strong_topics"]
+
+    def test_append_assessment_result_concept_test_accumulates(self, memory_store: MemoryStore):
+        memory_store.append_assessment_result("u2", {"type": "concept_test", "topic": "waves", "score": 0.4})
+        memory_store.append_assessment_result("u2", {"type": "concept_test", "topic": "kinematics", "score": 0.9})
+        memory_store.update_summary("u2")
+        summary = memory_store.get_performance_summary("u2")
+        assert summary["avg_score"] == pytest.approx(0.65)
+        assert "waves" in summary["weak_topics"]
+        assert "kinematics" in summary["strong_topics"]
+
+    def test_get_performance_summary_returns_default_for_unknown_user(self, memory_store: MemoryStore):
+        summary = memory_store.get_performance_summary("unknown")
+        assert summary["avg_score"] == 0.0
+        assert summary["weak_topics"] == []
+        assert summary["strong_topics"] == []
+        assert summary["alert_flag"] is False
+
+    def test_update_summary_sets_alert_flag_when_low_over_last_five(self, memory_store: MemoryStore):
+        for _ in range(5):
+            memory_store.append_assessment_result("u3", {"type": "quiz", "topic": "math", "score": 0.3})
+        memory_store.update_summary("u3")
+        summary = memory_store.get_performance_summary("u3")
+        assert summary["alert_flag"] is True
+        assert summary["avg_score"] == 0.3
+
+    def test_update_summary_no_alert_when_few_results(self, memory_store: MemoryStore):
+        memory_store.append_assessment_result("u4", {"type": "quiz", "topic": "math", "score": 0.2})
+        memory_store.update_summary("u4")
+        summary = memory_store.get_performance_summary("u4")
+        assert summary["alert_flag"] is False
+
+    def test_append_ignores_unknown_result_type(self, memory_store: MemoryStore):
+        memory_store.append_assessment_result("u5", {"type": "other", "score": 0.5})
+        memory_store.update_summary("u5")
+        summary = memory_store.get_performance_summary("u5")
+        assert summary["avg_score"] == 0.0
+
 
 class TestContextManager:
     """Tests for ContextManager wrapping ContextStore."""

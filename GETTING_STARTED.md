@@ -1,6 +1,6 @@
-# Getting Started (Phase 1)
+# Getting Started (Phase 1 & 2)
 
-Setup steps, environment variables, and how to run the API for the Phase 1 Education Chatbot (chat + health endpoints). For project overview and roadmap, see [README.md](README.md).
+Setup steps, environment variables, and how to run the API for the Education Chatbot (chat, health, and Phase 2 assessment endpoints). For project overview and roadmap, see [README.md](README.md).
 
 ---
 
@@ -35,7 +35,7 @@ Setup steps, environment variables, and how to run the API for the Phase 1 Educa
    ```
 
 4. **Optional: seed data**  
-   Phase 1 uses in-memory context; syllabus/admin/topic data is stubbed or in-code. To run the optional seed script (no-op stub for Phase 1):
+   Phase 1 uses in-memory context; syllabus/admin/topic data is stubbed or in-code. Phase 2 question bank is in-code (see `app/agents/shared_tools/question_bank.py`). To run the optional seed script:
    ```bash
    uv run python -m app.scripts.seed_data
    ```
@@ -90,13 +90,43 @@ uv run python -m app.scripts.smoke_test
 
 ---
 
-## Scripts (Phase 1)
+## Phase 2: Assessment endpoints
+
+Base path: `/api/v1/assessment`. All assessment endpoints use in-memory context; pass `session_id` (required) and optional `user_id` for performance tracking.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/quiz/start` | Start a new quiz. Body: `session_id`, optional `user_id`, `topic` (e.g. algebra, calculus), `difficulty` (beginner, intermediate, advanced). |
+| POST | `/quiz/answer` | Submit an answer for the current quiz question. Body: `session_id`, optional `user_id`, `answer` (option letter or text). |
+| POST | `/concept-test/start` | Start a concept test. Body: `session_id`, optional `user_id`, `topic`. Requires LLM configured. |
+| POST | `/concept-test/answer` | Submit an answer or finalize. Body: `session_id`, optional `user_id`, `answer` (or `"done"` to finish). |
+| GET | `/performance/{user_id}` | Get performance summary: `avg_score`, `weak_topics`, `strong_topics`, `alert_flag`. |
+
+**Example: full quiz flow**
+```bash
+# Start quiz
+curl -X POST http://localhost:8000/api/v1/assessment/quiz/start \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "s1", "user_id": "u1", "topic": "algebra", "difficulty": "beginner"}'
+
+# Submit answers (repeat until response has "completed": true)
+curl -X POST http://localhost:8000/api/v1/assessment/quiz/answer \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "s1", "user_id": "u1", "answer": "5"}'
+
+# Performance summary
+curl http://localhost:8000/api/v1/assessment/performance/u1
+```
+
+---
+
+## Scripts
 
 | Script | Purpose |
 |--------|---------|
 | `app/scripts/run_api.sh` | Start the FastAPI server with uvicorn |
-| `app/scripts/seed_data.py` | Optional seed (stub in Phase 1) |
-| `app/scripts/smoke_test.py` | Hit health and chat endpoints to verify deployment |
+| `app/scripts/seed_data.py` | Optional seed; Phase 2 reports in-code question bank stats |
+| `app/scripts/smoke_test.py` | Hit health, chat, and Phase 2 assessment endpoints to verify deployment |
 
 ---
 
