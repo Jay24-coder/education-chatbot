@@ -1,4 +1,17 @@
-"""ContextStore protocol: shared state/context interface for session and conversation."""
+"""ContextStore protocol: shared state/context interface for session and conversation.
+
+Session state key conventions (use existing get/set API; keys are namespaced to avoid collisions):
+
+- programming_test:state
+  Value shape: challenge id, language, started_at.
+  Implemented as: {"challenge": {"id": str, "topic": str, "difficulty": str}, "language": str, "started_at": str}.
+  challenge.id identifies the active challenge; language is e.g. "python"; started_at is ISO8601.
+
+- problem_solving:state
+  Value shape: stage, topic, difficulty, attempts.
+  Implemented as: {"guardrail": {"stage": str, "attempts": int, "confidence_flags": list, "topic": str | null, "difficulty": str | null}, "problem_text": str}.
+  guardrail holds the guardrail state machine state; problem_text is the extracted problem statement.
+"""
 
 from typing import Any, Protocol, runtime_checkable
 

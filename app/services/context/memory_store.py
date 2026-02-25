@@ -6,7 +6,7 @@ from app.services.context.store import ContextStore
 
 
 def _default_perf_metrics() -> dict[str, Any]:
-    return {"quizzes": [], "concept_tests": [], "last_activity": None}
+    return {"quizzes": [], "concept_tests": [], "programming_tests": [], "last_activity": None}
 
 
 def _default_perf_summary() -> dict[str, Any]:
@@ -72,6 +72,8 @@ class MemoryStore:
             metrics["quizzes"].append(result)
         elif result_type == "concept_test":
             metrics["concept_tests"].append(result)
+        elif result_type == "programming_test":
+            metrics["programming_tests"].append(result)
         metrics["last_activity"] = result.get("timestamp")
 
     def get_performance_summary(self, user_id: str) -> dict[str, Any]:
@@ -81,7 +83,11 @@ class MemoryStore:
 
     def update_summary(self, user_id: str) -> None:
         metrics = self._perf_metrics.get(user_id, _default_perf_metrics())
-        all_results = list(metrics["quizzes"]) + list(metrics["concept_tests"])
+        all_results = (
+            list(metrics["quizzes"])
+            + list(metrics["concept_tests"])
+            + list(metrics.get("programming_tests", []))
+        )
         recent = all_results[-5:] if len(all_results) >= 5 else all_results
         scores = [r.get("score") for r in recent if isinstance(r.get("score"), (int, float))]
         avg_score = sum(scores) / len(scores) if scores else 0.0

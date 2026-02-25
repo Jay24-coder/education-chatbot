@@ -26,8 +26,11 @@ class Intent(str, Enum):
     TOPIC = "topic"
     QUIZ = "quiz"
     CONCEPT_TEST = "concept_test"
+    PROGRAMMING_TEST = "programming_test"
     ASSESSMENT = "assessment"
     PERFORMANCE = "performance"
+    VISUALIZATION = "visualization"
+    PROBLEM_SOLVING = "problem_solving"
     UNKNOWN = "unknown"
 
 

@@ -35,6 +35,31 @@ _INTENT_KEYWORDS: list[tuple[Intent, list[str]]] = [
     (Intent.PERFORMANCE, ["progress", "my progress", "show my progress", "performance", "how am i doing", "my scores", "assessment results"]),
     (Intent.QUIZ, ["quiz", "start a quiz", "take a quiz", "give me a quiz", "quiz on", "start quiz"]),
     (Intent.CONCEPT_TEST, ["concept test", "test my understanding", "concept test on", "start concept test"]),
+    (
+        Intent.PROGRAMMING_TEST,
+        [
+            "programming test",
+            "coding test",
+            "coding challenge",
+            "code challenge",
+            "programming challenge",
+            "code exercise",
+            "test my coding",
+        ],
+    ),
+    (Intent.VISUALIZATION, ["draw", "visualize", "diagram", "graph of", "plot"]),
+    (
+        Intent.PROBLEM_SOLVING,
+        [
+            "problem solving",
+            "help me solve",
+            "solve this problem",
+            "work through this",
+            "step by step solution",
+            "walk me through",
+            "guide me through solving",
+        ],
+    ),
 ]
 
 

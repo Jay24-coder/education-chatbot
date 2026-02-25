@@ -62,6 +62,50 @@ class ConceptTestResponse(BaseModel):
     completed: bool = Field(default=False, description="True when concept test is finalized")
 
 
+# --- Programming test ---
+
+
+class ProgrammingTestStartRequest(BaseModel):
+    """Request body for starting a programming test."""
+
+    session_id: str = Field(..., min_length=1, description="Session ID for programming test state")
+    user_id: str | None = Field(default=None, description="Optional user identifier")
+    topic: str | None = Field(default=None, description="Optional topic filter for the challenge bank")
+    language: str | None = Field(default=None, description="Preferred programming language (e.g. python)")
+
+
+class ProgrammingTestSubmitRequest(BaseModel):
+    """Request body for submitting a programming solution."""
+
+    session_id: str = Field(..., min_length=1, description="Session ID for programming test state")
+    user_id: str | None = Field(default=None, description="Optional user identifier")
+    code: str = Field(..., description="Student's solution code")
+
+
+class ProgrammingTestCaseResult(BaseModel):
+    """Per-test-case execution result for a programming challenge."""
+
+    test_case_id: str = Field(..., description="Identifier of the test case")
+    passed: bool = Field(..., description="True if the test case passed")
+    actual_output: str | None = Field(default=None, description="Actual output from executing the code")
+    expected_output: str | None = Field(default=None, description="Expected output for the test case")
+    error: str | None = Field(default=None, description="Error message if execution failed")
+    execution_time_ms: float | None = Field(default=None, description="Execution time in milliseconds, if available")
+
+
+class ProgrammingTestResponse(BaseModel):
+    """Response body for programming test start or submission."""
+
+    content: str = Field(..., description="Problem statement, feedback, or final summary")
+    success: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    completed: bool = Field(default=False, description="True when the programming test is finalized")
+    test_case_results: list[ProgrammingTestCaseResult] = Field(
+        default_factory=list,
+        description="Per-test-case execution results when code has been run",
+    )
+
+
 # --- Performance ---
 
 

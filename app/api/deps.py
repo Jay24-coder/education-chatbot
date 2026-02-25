@@ -14,7 +14,10 @@ from app.services.context.memory_store import MemoryStore
 
 if TYPE_CHECKING:
     from app.agents.assessment.concept_test_agent import ConceptTestAgent
+    from app.agents.assessment.programming_test_agent import ProgrammingTestAgent
     from app.agents.monitoring.performance_monitor_agent import PerformanceMonitorAgent
+    from app.agents.specialized.problem_solving_agent import ProblemSolvingAgent
+    from app.agents.specialized.visualization_agent import VisualizationAgent
     from app.services.context.store import ContextStore
     from app.services.llm.provider import LLMProvider
 
@@ -77,3 +80,18 @@ def get_concept_test_agent():
 def get_performance_monitor():
     """Return PerformanceMonitorAgent from registry for assessment router; None if not registered."""
     return get_agent_registry().get_agent(Intent.PERFORMANCE)
+
+
+def get_programming_test_agent():
+    """Return ProgrammingTestAgent from registry for assessment router; None if not registered."""
+    return get_agent_registry().get_agent(Intent.PROGRAMMING_TEST)
+
+
+def get_visualization_agent() -> "VisualizationAgent | None":
+    """Return VisualizationAgent from registry for visualization router; None if not registered."""
+    return get_agent_registry().get_agent(Intent.VISUALIZATION)
+
+
+def get_problem_solving_agent() -> "ProblemSolvingAgent | None":
+    """Return ProblemSolvingAgent from registry for problem-solving router; None if not registered."""
+    return get_agent_registry().get_agent(Intent.PROBLEM_SOLVING)
