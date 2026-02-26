@@ -106,6 +106,13 @@ class ProgrammingTestResponse(BaseModel):
     )
 
 
+class ProgrammingTestJobResponse(BaseModel):
+    """Response body for async programming test submission (job-based)."""
+
+    job_id: int = Field(..., description="Job identifier for async programming test execution")
+    status: str = Field(..., description="Initial job status, typically PENDING")
+
+
 # --- Performance ---
 
 

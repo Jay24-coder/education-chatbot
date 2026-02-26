@@ -4,6 +4,9 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from app.config.settings import settings
+from app.db.pool import get_engine
+from app.db.repositories.conversations import ConversationsRepository
+from app.db.repositories.jobs import JobsRepository
 from app.orchestrator.context_manager import ContextManager
 from app.orchestrator.orchestrator_agent import OrchestratorAgent
 from app.orchestrator.registry import AgentRegistry
@@ -11,6 +14,7 @@ from app.orchestrator.tracing import NoOpTracer
 from app.orchestrator.types import Intent
 from app.orchestrator.wiring import build_agent_registry
 from app.services.context.memory_store import MemoryStore
+from app.services.context.postgres_store import PostgresContextStore
 
 if TYPE_CHECKING:
     from app.agents.assessment.concept_test_agent import ConceptTestAgent
@@ -24,8 +28,22 @@ if TYPE_CHECKING:
 
 @lru_cache(maxsize=1)
 def get_context_store() -> "ContextStore":
-    """Return the shared ContextStore (in-memory for Phase 1)."""
-    return MemoryStore()
+    """Return the shared ContextStore.
+
+    When settings.context_store_mode == "persistent", use PostgresContextStore;
+    otherwise fall back to in-memory MemoryStore (default behavior).
+    """
+    mode = (getattr(settings, "context_store_mode", "memory") or "memory").lower()
+    if mode != "persistent":
+        return MemoryStore()
+
+    engine = get_engine()
+    conversations_repo = ConversationsRepository(engine)
+    jobs_repo = JobsRepository(engine)
+    return PostgresContextStore(
+        conversations_repo=conversations_repo,
+        jobs_repo=jobs_repo,
+    )
 
 
 @lru_cache(maxsize=1)

@@ -1,21 +1,42 @@
 """Health endpoints: liveness and readiness (and optional agent health)."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 
 from app.api.deps import get_orchestrator
+from app.db.pool import get_engine
+from app.infra.redis.client import get_cache_client
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/live")
 def liveness() -> dict[str, str]:
-    """Liveness probe: process is running."""
+    """Liveness probe: process is running (does not depend on DB/Redis)."""
     return {"status": "ok"}
 
 
 @router.get("/ready")
-def readiness() -> dict[str, str]:
-    """Readiness probe: app is ready to accept traffic."""
+async def readiness() -> dict[str, str]:
+    """Readiness probe: app is ready to accept traffic (Postgres + Redis healthy)."""
+
+    # Check Postgres
+    try:
+        engine = get_engine()
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=503, detail=f"Postgres readiness check failed: {exc}") from exc
+
+    # Check Redis (cache client)
+    try:
+        client = get_cache_client()
+        pong = await client.ping()
+        if not pong:
+            raise RuntimeError("Redis PING returned falsy response")
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=503, detail=f"Redis readiness check failed: {exc}") from exc
+
     return {"status": "ready"}
 
 

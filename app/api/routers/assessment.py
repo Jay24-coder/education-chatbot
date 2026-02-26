@@ -18,6 +18,7 @@ from app.api.schemas.v1.assessment import (
     ProgrammingTestResponse,
     ProgrammingTestStartRequest,
     ProgrammingTestSubmitRequest,
+    ProgrammingTestJobResponse,
     QuizAnswerRequest,
     QuizResponse,
     QuizStartRequest,
@@ -27,6 +28,9 @@ from app.agents.shared_tools.code_execution import (
     SandboxError,
     UnsafeCodeError,
 )
+from app.db.pool import get_engine
+from app.db.repositories.jobs import JobsRepository
+from app.infra.redis import queues
 from app.orchestrator.types import AgentRequest, Intent
 
 if TYPE_CHECKING:
@@ -286,6 +290,53 @@ async def programming_test_submit(
         completed=meta.get("completed", False),
         test_case_results=meta.get("test_case_results") or [],
     )
+
+
+@router.post(
+    "/programming-test/submit-job",
+    response_model=ProgrammingTestJobResponse,
+    responses={
+        400: {"description": "Invalid request or session"},
+        503: {"description": "Assessment service unavailable"},
+    },
+)
+async def programming_test_submit_job(
+    body: ProgrammingTestSubmitRequest,
+    programming_agent: "ProgrammingTestAgent | None" = Depends(get_programming_test_agent),
+) -> ProgrammingTestJobResponse:
+    """Submit solution code as an async job for the current programming test.
+
+    This endpoint creates a job row and enqueues it on the code execution queue,
+    returning a job_id for clients to poll.
+    """
+    if not body.session_id or not body.session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id is required")
+    if programming_agent is None:
+        raise HTTPException(status_code=503, detail="Assessment service unavailable")
+
+    engine = get_engine()
+    jobs_repo = JobsRepository(engine)
+
+    payload = {
+        "session_id": body.session_id,
+        "user_id": body.user_id,
+        "code": body.code,
+        "intent": "PROGRAMMING_TEST",
+    }
+    job = await jobs_repo.create_job(
+        type="code_execution",
+        payload=payload,
+        status="PENDING",
+        user_id=body.user_id or None,
+        conversation_id=None,
+    )
+
+    await queues.enqueue(
+        queues.code_execution_queue_name(),
+        {"job_id": job.id},
+    )
+
+    return ProgrammingTestJobResponse(job_id=job.id, status=job.status)
 
 
 @router.get(
