@@ -21,6 +21,7 @@ from app.agents.problem_solving.guardrails import (
     state_to_dict,
 )
 from app.agents.problem_solving.image_processor import process_problem_image
+from app.observability.logging import get_logger
 from app.orchestrator.types import AgentRequest, AgentResponse, Intent
 
 if TYPE_CHECKING:
@@ -28,6 +29,9 @@ if TYPE_CHECKING:
     from app.services.llm.provider import LLMProvider
 
 KEY_PROBLEM_SOLVING_STATE = "problem_solving:state"
+
+
+logger = get_logger(__name__)
 
 
 async def _coarse_classify_async(problem_text: str, llm: "LLMProvider | None") -> tuple[str | None, str | None]:
@@ -181,6 +185,13 @@ class ProblemSolvingAgent(AbstractBaseAgent):
         context = request.context or {}
         message = (request.message or "").strip()
         correlation_id = request.correlation_id
+        logger.info(
+            "agent_request_start",
+            agent_id=self.agent_id,
+            intent="problem_solving",
+            correlation_id=correlation_id,
+            session_id=session_id or None,
+        )
 
         # Check for image (first turn): context may have image_bytes or image_path
         image_bytes = context.get("image_bytes") if isinstance(context.get("image_bytes"), bytes) else None
@@ -206,6 +217,11 @@ class ProblemSolvingAgent(AbstractBaseAgent):
                     result = process_problem_image(Path(image_path))
                 problem_text = result.text or "Problem statement could not be extracted."
             except Exception as e:
+                logger.error(
+                    "problem_solving_image_processing_error",
+                    correlation_id=correlation_id,
+                    session_id=session_id or None,
+                )
                 return AgentResponse(
                     content=f"I couldn't read the problem from the image: {e}. Please try again or type the problem.",
                     agent_id=self.agent_id,
@@ -239,23 +255,41 @@ class ProblemSolvingAgent(AbstractBaseAgent):
 
         # No image and no existing state: ask for problem or image
         if guardrail_state is None:
-            return AgentResponse(
+            response = AgentResponse(
                 content="Share a problem (upload an image or describe it) to get started.",
                 agent_id=self.agent_id,
                 success=False,
                 metadata={"intent": "problem_solving", "correlation_id": correlation_id},
                 error_message=None,
             )
+            logger.info(
+                "agent_request_done",
+                agent_id=self.agent_id,
+                intent="problem_solving",
+                correlation_id=correlation_id,
+                session_id=session_id or None,
+                response_length=len(response.content or ""),
+            )
+            return response
 
         # Subsequent turn: analyze understanding, next_state, generate response, save
         if not message:
-            return AgentResponse(
+            response = AgentResponse(
                 content="Please reply with your thoughts or answer so I can help you.",
                 agent_id=self.agent_id,
                 success=False,
                 metadata={"intent": "problem_solving", "correlation_id": correlation_id},
                 error_message=None,
             )
+            logger.info(
+                "agent_request_done",
+                agent_id=self.agent_id,
+                intent="problem_solving",
+                correlation_id=correlation_id,
+                session_id=session_id or None,
+                response_length=len(response.content or ""),
+            )
+            return response
 
         understanding = await _classify_understanding_async(problem_text, message, self._llm)
         analysis = Analysis(understanding=understanding)
@@ -289,10 +323,19 @@ class ProblemSolvingAgent(AbstractBaseAgent):
             except Exception:
                 pass
 
-        return AgentResponse(
+        response = AgentResponse(
             content=content,
             agent_id=self.agent_id,
             success=True,
             metadata=metadata,
             error_message=None,
         )
+        logger.info(
+            "agent_request_done",
+            agent_id=self.agent_id,
+            intent="problem_solving",
+            correlation_id=correlation_id,
+            session_id=session_id or None,
+            response_length=len(response.content or ""),
+        )
+        return response

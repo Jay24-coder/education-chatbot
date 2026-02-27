@@ -31,6 +31,7 @@ from app.agents.shared_tools.code_execution import (
 from app.db.pool import get_engine
 from app.db.repositories.jobs import JobsRepository
 from app.infra.redis import queues
+from app.observability.logging import get_logger
 from app.orchestrator.types import AgentRequest, Intent
 
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from app.agents.monitoring.performance_monitor_agent import PerformanceMonitorAgent
 
 router = APIRouter(prefix="/assessment", tags=["assessment"])
+logger = get_logger(__name__)
 
 
 def _context(user_id: str | None, session_id: str) -> dict:
@@ -96,6 +98,11 @@ async def quiz_start(
     quiz_agent: "QuizAgent | None" = Depends(get_quiz_agent),
 ) -> QuizResponse:
     """Start a new quiz. Requires session_id; optional topic and difficulty."""
+    logger.info(
+        "assessment_quiz_start_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     if not body.session_id or not body.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
     if quiz_agent is None:
@@ -109,6 +116,12 @@ async def quiz_start(
     context = _context(body.user_id, body.session_id)
     response = await quiz_agent.start_quiz(body.session_id, message, context)
     _raise_for_quiz_failure(response.content, response.success)
+    logger.info(
+        "assessment_quiz_start_done",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        completed=response.metadata.get("result_type") == "quiz",
+    )
     return QuizResponse(
         content=response.content,
         success=response.success,
@@ -132,6 +145,11 @@ async def quiz_answer(
     quiz_agent: "QuizAgent | None" = Depends(get_quiz_agent),
 ) -> QuizResponse:
     """Submit an answer for the current quiz question."""
+    logger.info(
+        "assessment_quiz_answer_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     if not body.session_id or not body.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
     if quiz_agent is None:
@@ -139,6 +157,12 @@ async def quiz_answer(
     context = _context(body.user_id, body.session_id)
     response = await quiz_agent.submit_answer(body.session_id, body.answer, context)
     _raise_for_quiz_failure(response.content, response.success)
+    logger.info(
+        "assessment_quiz_answer_done",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        completed=response.metadata.get("result_type") == "quiz",
+    )
     return QuizResponse(
         content=response.content,
         success=response.success,
@@ -160,6 +184,11 @@ async def concept_test_start(
     concept_test_agent: "ConceptTestAgent | None" = Depends(get_concept_test_agent),
 ) -> ConceptTestResponse:
     """Start a new concept test. Requires session_id; optional topic."""
+    logger.info(
+        "assessment_concept_test_start_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     if not body.session_id or not body.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
     if concept_test_agent is None:
@@ -168,6 +197,12 @@ async def concept_test_start(
     context = _context(body.user_id, body.session_id)
     response = await concept_test_agent.start_concept_test(body.session_id, message, context)
     _raise_for_concept_test_failure(response.content, response.success)
+    logger.info(
+        "assessment_concept_test_start_done",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        completed=response.metadata.get("result_type") == "concept_test",
+    )
     return ConceptTestResponse(
         content=response.content,
         success=response.success,
@@ -191,6 +226,11 @@ async def concept_test_answer(
     concept_test_agent: "ConceptTestAgent | None" = Depends(get_concept_test_agent),
 ) -> ConceptTestResponse:
     """Submit an answer for the current concept test question, or send 'done' to finalize."""
+    logger.info(
+        "assessment_concept_test_answer_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     if not body.session_id or not body.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
     if concept_test_agent is None:
@@ -204,6 +244,12 @@ async def concept_test_answer(
     )
     response = await concept_test_agent.process_request(request)
     _raise_for_concept_test_failure(response.content, response.success)
+    logger.info(
+        "assessment_concept_test_answer_done",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        completed=response.metadata.get("result_type") == "concept_test",
+    )
     return ConceptTestResponse(
         content=response.content,
         success=response.success,
@@ -225,6 +271,11 @@ async def programming_test_start(
     programming_agent: "ProgrammingTestAgent | None" = Depends(get_programming_test_agent),
 ) -> ProgrammingTestResponse:
     """Start a new programming test. Requires session_id; optional topic and language."""
+    logger.info(
+        "assessment_programming_test_start_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     if not body.session_id or not body.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
     if programming_agent is None:
@@ -242,6 +293,12 @@ async def programming_test_start(
     response = await programming_agent.start_test(body.session_id, message, context)
     _raise_for_programming_test_failure(response.content, response.success)
     meta = response.metadata or {}
+    logger.info(
+        "assessment_programming_test_start_done",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        completed=meta.get("completed", False),
+    )
     return ProgrammingTestResponse(
         content=response.content,
         success=response.success,
@@ -266,6 +323,11 @@ async def programming_test_submit(
     programming_agent: "ProgrammingTestAgent | None" = Depends(get_programming_test_agent),
 ) -> ProgrammingTestResponse:
     """Submit solution code for the current programming test."""
+    logger.info(
+        "assessment_programming_test_submit_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     if not body.session_id or not body.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
     if programming_agent is None:
@@ -275,14 +337,35 @@ async def programming_test_submit(
     try:
         response = await programming_agent.submit_code(body.session_id, body.code, context)
     except UnsafeCodeError as e:
+        logger.info(
+            "assessment_programming_test_submit_unsafe_code",
+            session_id=body.session_id or None,
+            user_id=body.user_id or None,
+        )
         raise HTTPException(status_code=400, detail=str(e)) from e
     except CodeExecutionTimeoutError as e:
+        logger.error(
+            "assessment_programming_test_submit_timeout",
+            session_id=body.session_id or None,
+            user_id=body.user_id or None,
+        )
         raise HTTPException(status_code=408, detail=str(e)) from e
     except SandboxError as e:
+        logger.error(
+            "assessment_programming_test_submit_sandbox_error",
+            session_id=body.session_id or None,
+            user_id=body.user_id or None,
+        )
         raise HTTPException(status_code=503, detail=str(e)) from e
 
     _raise_for_programming_test_failure(response.content, response.success)
     meta = response.metadata or {}
+    logger.info(
+        "assessment_programming_test_submit_done",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        completed=meta.get("completed", False),
+    )
     return ProgrammingTestResponse(
         content=response.content,
         success=response.success,
@@ -309,6 +392,11 @@ async def programming_test_submit_job(
     This endpoint creates a job row and enqueues it on the code execution queue,
     returning a job_id for clients to poll.
     """
+    logger.info(
+        "assessment_programming_test_submit_job_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     if not body.session_id or not body.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
     if programming_agent is None:
@@ -336,6 +424,12 @@ async def programming_test_submit_job(
         {"job_id": job.id},
     )
 
+    logger.info(
+        "assessment_programming_test_submit_job_enqueued",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        job_id=job.id,
+    )
     return ProgrammingTestJobResponse(job_id=job.id, status=job.status)
 
 
@@ -349,6 +443,10 @@ async def get_performance(
     performance_monitor: "PerformanceMonitorAgent | None" = Depends(get_performance_monitor),
 ) -> PerformanceSummaryResponse:
     """Get performance summary for a user (avg score, weak/strong topics, alert flag)."""
+    logger.info(
+        "assessment_performance_summary_requested",
+        user_id=user_id,
+    )
     if not user_id or not user_id.strip():
         raise HTTPException(status_code=400, detail="user_id is required")
     if performance_monitor is None:

@@ -11,6 +11,7 @@ from app.agents.shared_tools.question_bank import (
     QuestionBank,
     TopicArea,
 )
+from app.observability.logging import get_logger
 from app.orchestrator.types import AgentRequest, AgentResponse, AssessmentResult, Intent
 
 if TYPE_CHECKING:
@@ -21,6 +22,9 @@ KEY_QUIZ_STATE = "quiz:state"
 KEY_SUGGESTED_DIFFICULTY = "quiz:suggested_difficulty"
 QUESTION_COUNT = 5
 DIFFICULTY_ORDER = ["beginner", "intermediate", "advanced"]
+
+
+logger = get_logger(__name__)
 
 
 def _parse_topic_and_difficulty(message: str) -> tuple[str, str]:
@@ -291,11 +295,29 @@ class QuizAgent(AbstractBaseAgent):
         session_id = request.session_id or ""
         context = request.context or {}
         message = (request.message or "").strip()
+        logger.info(
+            "agent_request_start",
+            agent_id=self.agent_id,
+            intent=Intent.QUIZ.value,
+            correlation_id=request.correlation_id,
+            session_id=session_id or None,
+        )
 
         state = self._get_quiz_state(session_id)
         # Starting: no state and (message suggests "start" / "quiz" / topic or difficulty)
         start_keywords = ["start", "begin", "quiz", "give me", "want to take"] + DIFFICULTY_ORDER + [t.value for t in TopicArea]
         is_start = not state and any(kw in message.lower() for kw in start_keywords)
         if is_start or not state:
-            return await self.start_quiz(session_id, message, context)
-        return await self.submit_answer(session_id, message, context)
+            response = await self.start_quiz(session_id, message, context)
+        else:
+            response = await self.submit_answer(session_id, message, context)
+
+        logger.info(
+            "agent_request_done",
+            agent_id=self.agent_id,
+            intent=Intent.QUIZ.value,
+            correlation_id=request.correlation_id,
+            session_id=session_id or None,
+            response_length=len(response.content or ""),
+        )
+        return response

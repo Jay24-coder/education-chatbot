@@ -125,3 +125,30 @@ class TestChatEndpoint:
         # Without LLM: "not available"; with LLM or mock: concept test started or first question
         content_lower = data["content"].lower()
         assert "concept test" in content_lower or "not available" in content_lower or "question" in data["content"]
+
+
+class TestLoggingFlow:
+    """Basic assertions that key logging events are emitted for chat flows."""
+
+    def test_chat_happy_path_emits_core_events(self, client: TestClient, caplog: pytest.LogCaptureFixture):
+        caplog.set_level("INFO")
+        r = client.post(
+            "/api/v1/chat",
+            json={"message": "What is the syllabus?"},
+        )
+        assert r.status_code == 200
+        joined = "\n".join(rec.getMessage() for rec in caplog.records)
+        # We don't assert full structure, just that core event names appear somewhere
+        assert "chat_request_received" in joined
+        assert "orchestrator_route_start" in joined
+        assert "orchestrator_route_done" in joined
+
+    def test_chat_unknown_intent_emits_fallback_event(self, client: TestClient, caplog: pytest.LogCaptureFixture):
+        caplog.set_level("INFO")
+        r = client.post(
+            "/api/v1/chat",
+            json={"message": "hello world"},
+        )
+        assert r.status_code == 200
+        joined = "\n".join(rec.getMessage() for rec in caplog.records)
+        assert "orchestrator_fallback" in joined

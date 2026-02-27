@@ -11,12 +11,14 @@ from app.api.schemas.v1.problem_solving import (
     ProblemSolvingRespondResponse,
     ProblemSolvingStartResponse,
 )
+from app.observability.logging import get_logger
 from app.orchestrator.types import AgentRequest, Intent
 
 if TYPE_CHECKING:
     from app.agents.specialized.problem_solving_agent import ProblemSolvingAgent
 
 router = APIRouter(prefix="/problem-solving", tags=["problem_solving"])
+logger = get_logger(__name__)
 
 
 def _context(user_id: str | None, session_id: str) -> dict:
@@ -43,6 +45,9 @@ async def problem_solving_start(
     Multipart: form fields session_id, user_id (optional), message (optional); file field 'image'.
     JSON: session_id, user_id (optional), image_base64, message (optional).
     """
+    logger.info(
+        "problem_solving_start_received",
+    )
     if problem_solving_agent is None:
         raise HTTPException(status_code=503, detail="Problem-solving service unavailable")
 
@@ -101,6 +106,12 @@ async def problem_solving_start(
         context=context,
     )
     response = await problem_solving_agent.process_request(agent_request)
+    logger.info(
+        "problem_solving_start_done",
+        session_id=session_id or None,
+        user_id=user_id or None,
+        success=response.success,
+    )
     return ProblemSolvingStartResponse(
         content=response.content,
         success=response.success,
@@ -128,6 +139,11 @@ async def problem_solving_respond(
         raise HTTPException(status_code=400, detail="answer is required")
 
     correlation_id = getattr(request.state, "correlation_id", None)
+    logger.info(
+        "problem_solving_respond_received",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+    )
     context = _context(body.user_id, body.session_id)
     agent_request = AgentRequest(
         message=body.answer.strip(),
@@ -137,6 +153,12 @@ async def problem_solving_respond(
         context=context,
     )
     response = await problem_solving_agent.process_request(agent_request)
+    logger.info(
+        "problem_solving_respond_done",
+        session_id=body.session_id or None,
+        user_id=body.user_id or None,
+        success=response.success,
+    )
     return ProblemSolvingRespondResponse(
         content=response.content,
         success=response.success,

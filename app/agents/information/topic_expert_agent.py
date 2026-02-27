@@ -3,10 +3,14 @@
 from typing import TYPE_CHECKING
 
 from app.agents.base.base_agent import AbstractBaseAgent
+from app.observability.logging import get_logger
 from app.orchestrator.types import AgentRequest, AgentResponse, Intent
 
 if TYPE_CHECKING:
     from app.services.llm.provider import LLMProvider
+
+
+logger = get_logger(__name__)
 
 
 # Small in-memory KB for stub mode (when LLM not configured)
@@ -80,6 +84,13 @@ class TopicExpertAgent(AbstractBaseAgent):
     async def process_request(self, request: AgentRequest) -> AgentResponse:
         """Answer concept/topic questions; use LLM if configured else stub KB."""
         msg = (request.message or "").strip()
+        logger.info(
+            "agent_request_start",
+            agent_id=self.agent_id,
+            intent=Intent.TOPIC.value,
+            correlation_id=request.correlation_id,
+            session_id=request.session_id or None,
+        )
         concept_key = _find_concept_key(msg)
 
         if self._llm and msg:
@@ -109,10 +120,19 @@ class TopicExpertAgent(AbstractBaseAgent):
                     f"{', '.join(_STUB_CONCEPTS.keys())}."
                 )
 
-        return AgentResponse(
+        response = AgentResponse(
             content=content,
             agent_id=self.agent_id,
             success=True,
             metadata={"intent": Intent.TOPIC.value, "correlation_id": request.correlation_id},
             error_message=None,
         )
+        logger.info(
+            "agent_request_done",
+            agent_id=self.agent_id,
+            intent=Intent.TOPIC.value,
+            correlation_id=request.correlation_id,
+            session_id=request.session_id or None,
+            response_length=len(response.content or ""),
+        )
+        return response

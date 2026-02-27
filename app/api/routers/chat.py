@@ -5,10 +5,12 @@ from fastapi.responses import JSONResponse
 
 from app.api.deps import get_orchestrator
 from app.api.schemas.v1.chat import ChatRequest, ChatResponse
+from app.observability.logging import get_logger
 from app.orchestrator.types import UserRequest
 from app.utils.errors import OrchestratorError, ValidationError
 
 router = APIRouter(tags=["chat"])
+logger = get_logger(__name__)
 
 
 @router.post(
@@ -27,24 +29,60 @@ async def chat(
 ) -> ChatResponse:
     """Accept user message and optional session_id; return assistant response."""
     correlation_id = getattr(request.state, "correlation_id", None)
-    user_request = UserRequest(
-        message=body.message,
-        session_id=body.session_id,
+    message = body.message or ""
+    session_id = body.session_id or ""
+    user_id = body.user_id or ""
+
+    logger.info(
+        "chat_request_received",
         correlation_id=correlation_id,
-        user_id=body.user_id,
+        session_id=session_id or None,
+        user_id=user_id or None,
+        message_length=len(message),
+    )
+
+    user_request = UserRequest(
+        message=message,
+        session_id=session_id or None,
+        correlation_id=correlation_id,
+        user_id=user_id or None,
     )
     try:
         response = await orchestrator.route_request(user_request)
     except ValidationError as e:
+        logger.info(
+            "chat_request_validation_error",
+            correlation_id=correlation_id,
+            session_id=session_id or None,
+            user_id=user_id or None,
+            error_code=e.code,
+        )
         return JSONResponse(
             status_code=400,
             content={"detail": e.message, "code": e.code},
         )
     except OrchestratorError as e:
+        logger.error(
+            "chat_request_orchestrator_error",
+            correlation_id=correlation_id,
+            session_id=session_id or None,
+            user_id=user_id or None,
+            error_code=e.code,
+        )
         return JSONResponse(
             status_code=500,
             content={"detail": e.message, "code": e.code},
         )
+
+    logger.info(
+        "chat_response_sent",
+        correlation_id=correlation_id,
+        session_id=session_id or None,
+        user_id=user_id or None,
+        success=response.success,
+        response_length=len(response.content or ""),
+    )
+
     return ChatResponse(
         content=response.content,
         success=response.success,

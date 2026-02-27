@@ -1,6 +1,7 @@
 """Structured logging setup using structlog."""
 
 import logging
+import os
 import sys
 from typing import Any
 
@@ -14,11 +15,15 @@ def configure_logging(level: str = "INFO") -> None:
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
+    # Allow environment variable to override default level (e.g. LOG_LEVEL=DEBUG)
+    env_level = os.getenv("LOG_LEVEL")
+    effective_level = (env_level or level).upper()
+
     # Configure standard library logging
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=getattr(logging, level.upper()),
+        level=getattr(logging, effective_level, logging.INFO),
     )
 
     # Configure structlog
@@ -32,7 +37,7 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, level.upper())
+            getattr(logging, effective_level, logging.INFO)
         ),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(),

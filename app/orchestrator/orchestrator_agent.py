@@ -183,6 +183,12 @@ class OrchestratorAgent:
             span.set_attribute("message_length", len(request.message))
             intent = classify_intent(request.message)
             span.set_attribute("intent", intent.value)
+            logger.info(
+                "orchestrator_intent_classified",
+                correlation_id=correlation_id,
+                session_id=request.session_id,
+                intent=intent.value,
+            )
 
             agent: "BaseAgent | None" = select_agent(self._registry, intent)
             if agent is None or intent == Intent.UNKNOWN:
@@ -198,7 +204,10 @@ class OrchestratorAgent:
                 ])
                 if self._context_manager and request.session_id:
                     self._context_manager.persist_turn(
-                        request.session_id, request.message, fallback.content
+                        request.session_id,
+                        request.message,
+                        fallback.content,
+                        correlation_id=correlation_id,
                     )
                 return fallback
 
@@ -206,6 +215,12 @@ class OrchestratorAgent:
             context: dict[str, Any] = {}
             if session_id:
                 context = self._context_store.get(session_id)
+                logger.info(
+                    "orchestrator_context_loaded",
+                    correlation_id=correlation_id,
+                    session_id=session_id,
+                    context_keys_count=len(context.keys()),
+                )
 
             agent_request = AgentRequest(
                 message=request.message,
@@ -233,7 +248,16 @@ class OrchestratorAgent:
             result = _aggregate_responses([response])
             if self._context_manager and session_id:
                 self._context_manager.persist_turn(
-                    session_id, request.message, result.content
+                    session_id,
+                    request.message,
+                    result.content,
+                    correlation_id=correlation_id,
+                )
+                logger.info(
+                    "orchestrator_context_persisted",
+                    correlation_id=correlation_id,
+                    session_id=session_id,
+                    agent_id=result.agent_id,
                 )
             return result
         except ValidationError:
@@ -242,6 +266,12 @@ class OrchestratorAgent:
             raise
         except Exception as e:
             span.set_attribute("error", str(e))
+            logger.error(
+                "orchestrator_unexpected_error",
+                correlation_id=correlation_id,
+                session_id=request.session_id,
+                error=str(e),
+            )
             raise OrchestratorError(
                 f"Orchestrator failed: {e!s}",
                 code="ORCHESTRATOR_ERROR",

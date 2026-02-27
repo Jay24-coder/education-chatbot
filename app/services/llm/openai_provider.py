@@ -1,11 +1,17 @@
 """OpenAI-backed LLM provider with timeout and retry."""
 
+from time import perf_counter
+
 from openai import AsyncOpenAI
 
 from app.config.resiliency import resiliency_config
 from app.config.settings import settings
+from app.observability.logging import get_logger
 from app.orchestrator.policies import with_retry, with_timeout
 from app.utils.errors import LLMProviderError
+
+
+logger = get_logger(__name__)
 
 
 class OpenAIProvider:
@@ -32,6 +38,15 @@ class OpenAIProvider:
         model_id = model or self._default_model
         timeout = timeout_seconds if timeout_seconds is not None else self._timeout
 
+        prompt_text = prompt or ""
+        logger.info(
+            "llm_call_start",
+            provider="openai",
+            model=model_id,
+            prompt_length=len(prompt_text),
+        )
+        start = perf_counter()
+
         async def _request() -> str:
             response = await self._client.chat.completions.create(
                 model=model_id,
@@ -51,11 +66,28 @@ class OpenAIProvider:
             )
 
         try:
-            return await with_retry(
+            result = await with_retry(
                 _call,
                 retry_on=(LLMProviderError, Exception),
             )
+            duration_ms = (perf_counter() - start) * 1000
+            logger.info(
+                "llm_call_done",
+                provider="openai",
+                model=model_id,
+                duration_ms=round(duration_ms, 2),
+                completion_length=len(result or ""),
+            )
+            return result
         except LLMProviderError:
             raise
         except Exception as e:
+            duration_ms = (perf_counter() - start) * 1000
+            logger.error(
+                "llm_call_error",
+                provider="openai",
+                model=model_id,
+                duration_ms=round(duration_ms, 2),
+                error=str(e),
+            )
             raise LLMProviderError(str(e), code="LLM_ERROR") from e

@@ -1,9 +1,16 @@
 """Context Manager: student/session state and conversation history using ContextStore."""
 
+import asyncio
+import inspect
 from typing import Any, TYPE_CHECKING
+
+from app.observability.logging import get_logger
 
 if TYPE_CHECKING:
     from app.services.context.store import ContextStore
+
+
+logger = get_logger(__name__)
 
 
 class ContextManager:
@@ -14,6 +21,48 @@ class ContextManager:
 
     def __init__(self, store: "ContextStore") -> None:
         self._store = store
+
+    def _maybe_schedule(
+        self,
+        result: Any,
+        *,
+        session_id: str,
+        role: str,
+        correlation_id: str | None = None,
+    ) -> None:
+        """
+        If result is an awaitable (e.g. coroutine from an async ContextStore),
+        execute it and log failures in a structured way.
+        """
+        if not inspect.isawaitable(result):
+            return
+
+        async def _run_with_logging() -> None:
+            try:
+                await result
+                logger.info(
+                    "context_persist_success",
+                    session_id=session_id or None,
+                    role=role,
+                    correlation_id=correlation_id,
+                )
+            except Exception as e:  # pragma: no cover - defensive logging
+                logger.error(
+                    "context_persist_failed",
+                    session_id=session_id or None,
+                    role=role,
+                    correlation_id=correlation_id,
+                    error=str(e),
+                    exc_info=True,
+                )
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop (e.g. synchronous test context); block until done.
+            asyncio.run(_run_with_logging())
+        else:
+            loop.create_task(_run_with_logging())
 
     def get_session_context(self, session_id: str, key: str | None = None) -> dict[str, Any]:
         """Get session state for routing/agents. If key is None, returns full session dict."""
@@ -34,12 +83,25 @@ class ContextManager:
         session_id: str,
         user_message: str,
         assistant_content: str,
+        correlation_id: str | None = None,
     ) -> None:
         """Append user and assistant messages to conversation history for the session."""
         if not session_id:
             return
-        self._store.append_message(session_id, "user", user_message)
-        self._store.append_message(session_id, "assistant", assistant_content)
+        user_result = self._store.append_message(session_id, "user", user_message)
+        self._maybe_schedule(
+            user_result,
+            session_id=session_id,
+            role="user",
+            correlation_id=correlation_id,
+        )
+        assistant_result = self._store.append_message(session_id, "assistant", assistant_content)
+        self._maybe_schedule(
+            assistant_result,
+            session_id=session_id,
+            role="assistant",
+            correlation_id=correlation_id,
+        )
 
     def set_state(self, session_id: str, key: str, value: Any) -> None:
         """Set a value in the session state (e.g. student preferences)."""

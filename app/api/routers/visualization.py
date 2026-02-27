@@ -9,12 +9,14 @@ from app.api.schemas.v1.visualization import (
     VisualizationGenerateRequest,
     VisualizationGenerateResponse,
 )
+from app.observability.logging import get_logger
 from app.orchestrator.types import AgentRequest, Intent
 
 if TYPE_CHECKING:
     from app.agents.specialized.visualization_agent import VisualizationAgent
 
 router = APIRouter(prefix="/visualization", tags=["visualization"])
+logger = get_logger(__name__)
 
 
 @router.post(
@@ -30,6 +32,10 @@ async def generate_visualization(
     visualization_agent: "VisualizationAgent | None" = Depends(get_visualization_agent),
 ) -> VisualizationGenerateResponse:
     """Generate a diagram (Mermaid) or graph (chart spec) from a description. Output type inferred if omitted."""
+    logger.info(
+        "visualization_generate_received",
+        output_type=body.output_type or None,
+    )
     if not body.description or not body.description.strip():
         raise HTTPException(status_code=400, detail="description is required")
     if visualization_agent is None:
@@ -49,6 +55,11 @@ async def generate_visualization(
         context={},
     )
     response = await visualization_agent.process_request(request)
+    logger.info(
+        "visualization_generate_done",
+        output_type=body.output_type or None,
+        success=response.success,
+    )
     return VisualizationGenerateResponse(
         content=response.content,
         success=response.success,

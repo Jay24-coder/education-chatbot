@@ -6,13 +6,16 @@ from sqlalchemy import text
 from app.api.deps import get_orchestrator
 from app.db.pool import get_engine
 from app.infra.redis.client import get_cache_client
+from app.observability.logging import get_logger
 
 router = APIRouter(tags=["health"])
+logger = get_logger(__name__)
 
 
 @router.get("/live")
 def liveness() -> dict[str, str]:
     """Liveness probe: process is running (does not depend on DB/Redis)."""
+    logger.info("health_liveness_check")
     return {"status": "ok"}
 
 
@@ -26,6 +29,7 @@ async def readiness() -> dict[str, str]:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
     except Exception as exc:  # pragma: no cover - defensive
+        logger.error("health_readiness_postgres_failed")
         raise HTTPException(status_code=503, detail=f"Postgres readiness check failed: {exc}") from exc
 
     # Check Redis (cache client)
@@ -35,8 +39,10 @@ async def readiness() -> dict[str, str]:
         if not pong:
             raise RuntimeError("Redis PING returned falsy response")
     except Exception as exc:  # pragma: no cover - defensive
+        logger.error("health_readiness_redis_failed")
         raise HTTPException(status_code=503, detail=f"Redis readiness check failed: {exc}") from exc
 
+    logger.info("health_readiness_ok")
     return {"status": "ready"}
 
 
