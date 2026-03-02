@@ -27,17 +27,17 @@ class TestMemoryStore:
         assert memory_store.get("s1") == {"a": 1, "b": 2}
 
     def test_append_message_and_get_history(self, memory_store: MemoryStore):
-        memory_store.append_message("s1", "user", "hello")
-        memory_store.append_message("s1", "assistant", "hi there")
+        memory_store.append_message("s1", "u1", "user", "hello")
+        memory_store.append_message("s1", "u1", "assistant", "hi there")
         history = memory_store.get_history("s1")
         assert len(history) == 2
         assert history[0] == {"role": "user", "content": "hello"}
         assert history[1] == {"role": "assistant", "content": "hi there"}
 
     def test_get_history_with_limit(self, memory_store: MemoryStore):
-        memory_store.append_message("s1", "user", "1")
-        memory_store.append_message("s1", "assistant", "2")
-        memory_store.append_message("s1", "user", "3")
+        memory_store.append_message("s1", "u1", "user", "1")
+        memory_store.append_message("s1", "u1", "assistant", "2")
+        memory_store.append_message("s1", "u1", "user", "3")
         assert len(memory_store.get_history("s1", limit=2)) == 2
         assert memory_store.get_history("s1", limit=2)[-1]["content"] == "3"
 
@@ -48,7 +48,7 @@ class TestMemoryStore:
 
     def test_delete_session_removes_all(self, memory_store: MemoryStore):
         memory_store.set("s1", "x", 1)
-        memory_store.append_message("s1", "user", "hi")
+        memory_store.append_message("s1", "u1", "user", "hi")
         memory_store.delete("s1", key=None)
         assert memory_store.get("s1") == {}
         assert memory_store.get_history("s1") == []
@@ -118,7 +118,7 @@ class TestContextManager:
         assert cm.get_session_context("missing") == {}
 
     def test_get_conversation_history_delegates_to_store(self, memory_store: MemoryStore):
-        memory_store.append_message("s1", "user", "hello")
+        memory_store.append_message("s1", "u1", "user", "hello")
         cm = ContextManager(memory_store)
         hist = cm.get_conversation_history("s1")
         assert len(hist) == 1
@@ -126,7 +126,7 @@ class TestContextManager:
 
     def test_persist_turn_appends_user_and_assistant(self, memory_store: MemoryStore):
         cm = ContextManager(memory_store)
-        cm.persist_turn("s1", "user msg", "assistant msg")
+        cm.persist_turn("s1", "u1", "user msg", "assistant msg")
         hist = memory_store.get_history("s1")
         assert len(hist) == 2
         assert hist[0]["role"] == "user" and hist[0]["content"] == "user msg"
@@ -134,7 +134,7 @@ class TestContextManager:
 
     def test_persist_turn_empty_session_id_no_op(self, memory_store: MemoryStore):
         cm = ContextManager(memory_store)
-        cm.persist_turn("", "u", "a")
+        cm.persist_turn("", "u1", "u", "a")
         assert memory_store.get_history("") == []
 
     def test_set_state_and_set_state_many(self, memory_store: MemoryStore):

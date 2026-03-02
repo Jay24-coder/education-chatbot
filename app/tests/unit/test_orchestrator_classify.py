@@ -50,24 +50,24 @@ class TestValidateAndSanitizeRequest:
     """Tests for validate_and_sanitize_request(UserRequest)."""
 
     def test_valid_request_passes_through(self):
-        req = UserRequest(message="What is the syllabus?")
+        req = UserRequest(message="What is the syllabus?", user_id="test-user")
         out = validate_and_sanitize_request(req)
         assert out.message == "What is the syllabus?"
         assert out.session_id is None
 
     def test_strips_whitespace(self):
-        req = UserRequest(message="  hello  ")
+        req = UserRequest(message="  hello  ", user_id="test-user")
         out = validate_and_sanitize_request(req)
         assert out.message == "hello"
 
     def test_empty_after_strip_raises(self):
-        req = UserRequest(message="   ")
+        req = UserRequest(message="   ", user_id="test-user")
         with pytest.raises(ValidationError) as exc_info:
             validate_and_sanitize_request(req)
         assert exc_info.value.code == "EMPTY_MESSAGE"
 
     def test_message_too_long_raises(self):
-        req = UserRequest(message="x" * 33_000)
+        req = UserRequest(message="x" * 33_000, user_id="test-user")
         with pytest.raises(ValidationError) as exc_info:
             validate_and_sanitize_request(req)
         assert exc_info.value.code == "MESSAGE_TOO_LONG"
@@ -77,6 +77,7 @@ class TestValidateAndSanitizeRequest:
             message="hi",
             session_id="s1",
             correlation_id="c1",
+            user_id="test-user",
         )
         out = validate_and_sanitize_request(req)
         assert out.session_id == "s1"

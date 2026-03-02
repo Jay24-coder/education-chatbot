@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 @dataclass
 class ConversationRecord:
     id: int
+    session_id: Optional[str]
     user_id: Optional[str]
     created_at: Any
     updated_at: Any
@@ -32,19 +33,96 @@ class ConversationsRepository:
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
 
-    async def create_conversation(self, user_id: Optional[str] = None) -> ConversationRecord:
+    async def create_conversation(
+        self,
+        session_id: Optional[str] = None,
+        *,
+        user_id: str,
+    ) -> ConversationRecord:
         query = text(
             """
-            INSERT INTO conversations (user_id)
-            VALUES (:user_id)
-            RETURNING id, user_id, created_at, updated_at
+            INSERT INTO conversations (session_id, user_id)
+            VALUES (:session_id, :user_id)
+            RETURNING id, session_id, user_id, created_at, updated_at
             """
         )
         async with self._engine.begin() as conn:
-            row = (await conn.execute(query, {"user_id": user_id})).one()
+            row = (
+                await conn.execute(
+                    query,
+                    {"session_id": session_id, "user_id": user_id},
+                )
+            ).one()
 
         return ConversationRecord(
             id=row.id,
+            session_id=row.session_id,
+            user_id=row.user_id,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    async def get_by_session_id(self, session_id: str) -> Optional[ConversationRecord]:
+        query = text(
+            """
+            SELECT id, session_id, user_id, created_at, updated_at
+            FROM conversations
+            WHERE session_id = :session_id
+            """
+        )
+        async with self._engine.connect() as conn:
+            result = await conn.execute(query, {"session_id": session_id})
+            row = result.one_or_none()
+
+        if row is None:
+            return None
+
+        return ConversationRecord(
+            id=row.id,
+            session_id=row.session_id,
+            user_id=row.user_id,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    async def get_or_create_conversation(
+        self,
+        session_id: str,
+        user_id: str,
+    ) -> ConversationRecord:
+        insert_query = text(
+            """
+            INSERT INTO conversations (session_id, user_id)
+            VALUES (:session_id, :user_id)
+            ON CONFLICT (session_id) DO NOTHING
+            RETURNING id, session_id, user_id, created_at, updated_at
+            """
+        )
+        select_query = text(
+            """
+            SELECT id, session_id, user_id, created_at, updated_at
+            FROM conversations
+            WHERE session_id = :session_id
+            """
+        )
+        async with self._engine.begin() as conn:
+            result = await conn.execute(
+                insert_query,
+                {"session_id": session_id, "user_id": user_id},
+            )
+            row = result.one_or_none()
+            if row is None:
+                result = await conn.execute(select_query, {"session_id": session_id})
+                row = result.one_or_none()
+
+        if row is None:
+            raise RuntimeError(
+                f"get_or_create_conversation: no row after insert/select for session_id={session_id!r}"
+            )
+
+        return ConversationRecord(
+            id=row.id,
+            session_id=row.session_id,
             user_id=row.user_id,
             created_at=row.created_at,
             updated_at=row.updated_at,
@@ -86,7 +164,7 @@ class ConversationsRepository:
     async def get_conversation(self, conversation_id: int) -> Optional[ConversationRecord]:
         query = text(
             """
-            SELECT id, user_id, created_at, updated_at
+            SELECT id, session_id, user_id, created_at, updated_at
             FROM conversations
             WHERE id = :conversation_id
             """
@@ -100,6 +178,7 @@ class ConversationsRepository:
 
         return ConversationRecord(
             id=row.id,
+            session_id=row.session_id,
             user_id=row.user_id,
             created_at=row.created_at,
             updated_at=row.updated_at,

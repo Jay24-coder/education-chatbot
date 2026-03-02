@@ -40,7 +40,7 @@ class UserRequest(BaseModel):
     message: str = Field(..., min_length=1, description="User message content")
     session_id: str | None = Field(default=None, description="Session for context")
     correlation_id: str | None = Field(default=None, description="Request correlation ID")
-    user_id: str | None = Field(default=None, description="Optional user identifier")
+    user_id: str = Field(..., min_length=1, description="User identifier")
 
 
 class AgentRequest(BaseModel):

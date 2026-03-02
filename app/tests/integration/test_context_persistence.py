@@ -27,7 +27,7 @@ class TestContextPersistence:
         )
         session_id = "persist-session-1"
 
-        req1 = UserRequest(message="What is the syllabus?", session_id=session_id)
+        req1 = UserRequest(message="What is the syllabus?", session_id=session_id, user_id="test-user")
         resp1 = await orch.route_request(req1)
         assert resp1.success is True
 
@@ -36,7 +36,7 @@ class TestContextPersistence:
         assert history[0]["role"] == "user" and "syllabus" in history[0]["content"].lower()
         assert history[1]["role"] == "assistant"
 
-        req2 = UserRequest(message="What are the prerequisites?", session_id=session_id)
+        req2 = UserRequest(message="What are the prerequisites?", session_id=session_id, user_id="test-user")
         resp2 = await orch.route_request(req2)
         assert resp2.success is True
 
@@ -59,7 +59,7 @@ class TestContextPersistence:
             tracer=NoOpTracer(),
             context_manager=cm,
         )
-        req = UserRequest(message="syllabus?", session_id="s1")
+        req = UserRequest(message="syllabus?", session_id="s1", user_id="test-user")
         resp = await orch.route_request(req)
         assert resp.success is True
         context = store.get("s1")

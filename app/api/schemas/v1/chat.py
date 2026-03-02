@@ -10,7 +10,7 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, description="User message content")
     session_id: str | None = Field(default=None, description="Session ID for conversation context")
-    user_id: str | None = Field(default=None, description="Optional user identifier")
+    user_id: str = Field(..., min_length=1, description="User identifier")
 
 
 class ChatResponse(BaseModel):

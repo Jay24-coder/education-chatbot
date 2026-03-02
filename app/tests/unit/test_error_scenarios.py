@@ -33,7 +33,7 @@ class TestUnknownIntentFallback:
             context_store=store,
             tracer=NoOpTracer(),
         )
-        resp = await orch.route_request(UserRequest(message="hello world"))
+        resp = await orch.route_request(UserRequest(message="hello world", user_id="test-user"))
         assert resp.success is True
         assert resp.agent_id == "orchestrator"
         assert resp.metadata.get("fallback") is True
@@ -45,12 +45,12 @@ class TestInvalidInput:
 
     def test_empty_message_raises_validation(self):
         with pytest.raises(ValidationError) as exc_info:
-            validate_and_sanitize_request(UserRequest(message="   "))
+            validate_and_sanitize_request(UserRequest(message="   ", user_id="test-user"))
         assert exc_info.value.code == "EMPTY_MESSAGE"
 
     def test_message_too_long_raises_validation(self):
         with pytest.raises(ValidationError) as exc_info:
-            validate_and_sanitize_request(UserRequest(message="x" * 33_000))
+            validate_and_sanitize_request(UserRequest(message="x" * 33_000, user_id="test-user"))
         assert exc_info.value.code == "MESSAGE_TOO_LONG"
 
 

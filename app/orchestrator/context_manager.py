@@ -5,6 +5,7 @@ import inspect
 from typing import Any, TYPE_CHECKING
 
 from app.observability.logging import get_logger
+from app.utils.errors import OrchestratorError
 
 if TYPE_CHECKING:
     from app.services.context.store import ContextStore
@@ -81,6 +82,7 @@ class ContextManager:
     def persist_turn(
         self,
         session_id: str,
+        user_id: str,
         user_message: str,
         assistant_content: str,
         correlation_id: str | None = None,
@@ -88,20 +90,69 @@ class ContextManager:
         """Append user and assistant messages to conversation history for the session."""
         if not session_id:
             return
-        user_result = self._store.append_message(session_id, "user", user_message)
+        user_result = self._store.append_message(session_id, user_id, "user", user_message)
         self._maybe_schedule(
             user_result,
             session_id=session_id,
             role="user",
             correlation_id=correlation_id,
         )
-        assistant_result = self._store.append_message(session_id, "assistant", assistant_content)
+        assistant_result = self._store.append_message(session_id, user_id, "assistant", assistant_content)
         self._maybe_schedule(
             assistant_result,
             session_id=session_id,
             role="assistant",
             correlation_id=correlation_id,
         )
+
+    async def persist_turn_strict(
+        self,
+        session_id: str,
+        user_id: str,
+        user_message: str,
+        assistant_content: str,
+        correlation_id: str | None = None,
+    ) -> None:
+        """
+        Persist user and assistant messages in a blocking way.
+
+        Any error during persistence is treated as a hard failure and surfaced as
+        an OrchestratorError so the chat flow stops and the client sees a clear
+        "temporarily down" style message.
+        """
+        if not session_id:
+            return
+
+        try:
+            user_result = self._store.append_message(session_id, user_id, "user", user_message)
+            if inspect.isawaitable(user_result):
+                await user_result
+
+            assistant_result = self._store.append_message(
+                session_id, user_id, "assistant", assistant_content
+            )
+            if inspect.isawaitable(assistant_result):
+                await assistant_result
+
+            logger.info(
+                "context_persist_success",
+                session_id=session_id or None,
+                role="user+assistant",
+                correlation_id=correlation_id,
+            )
+        except Exception as e:  # pragma: no cover - defensive propagation
+            logger.error(
+                "context_persist_failed",
+                session_id=session_id or None,
+                role="user+assistant",
+                correlation_id=correlation_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise OrchestratorError(
+                "Sorry, we are temporarily down. Please try again later.",
+                code="PERSISTENCE_ERROR",
+            ) from e
 
     def set_state(self, session_id: str, key: str, value: Any) -> None:
         """Set a value in the session state (e.g. student preferences)."""

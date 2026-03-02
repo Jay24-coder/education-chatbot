@@ -27,25 +27,25 @@ async def chat(
     request: Request,
     orchestrator=Depends(get_orchestrator),
 ) -> ChatResponse:
-    """Accept user message and optional session_id; return assistant response."""
+    """Accept user message, required user_id, and optional session_id; return assistant response."""
     correlation_id = getattr(request.state, "correlation_id", None)
     message = body.message or ""
-    session_id = body.session_id or ""
-    user_id = body.user_id or ""
+    session_id = body.session_id or None
+    user_id = body.user_id
 
     logger.info(
         "chat_request_received",
         correlation_id=correlation_id,
-        session_id=session_id or None,
-        user_id=user_id or None,
+        session_id=session_id,
+        user_id=user_id,
         message_length=len(message),
     )
 
     user_request = UserRequest(
         message=message,
-        session_id=session_id or None,
+        session_id=session_id,
         correlation_id=correlation_id,
-        user_id=user_id or None,
+        user_id=user_id,
     )
     try:
         response = await orchestrator.route_request(user_request)
@@ -53,8 +53,8 @@ async def chat(
         logger.info(
             "chat_request_validation_error",
             correlation_id=correlation_id,
-            session_id=session_id or None,
-            user_id=user_id or None,
+            session_id=session_id,
+            user_id=user_id,
             error_code=e.code,
         )
         return JSONResponse(
@@ -65,8 +65,8 @@ async def chat(
         logger.error(
             "chat_request_orchestrator_error",
             correlation_id=correlation_id,
-            session_id=session_id or None,
-            user_id=user_id or None,
+            session_id=session_id,
+            user_id=user_id,
             error_code=e.code,
         )
         return JSONResponse(
@@ -77,8 +77,8 @@ async def chat(
     logger.info(
         "chat_response_sent",
         correlation_id=correlation_id,
-        session_id=session_id or None,
-        user_id=user_id or None,
+        session_id=session_id,
+        user_id=user_id,
         success=response.success,
         response_length=len(response.content or ""),
     )

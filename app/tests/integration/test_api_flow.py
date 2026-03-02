@@ -40,7 +40,7 @@ class TestChatEndpoint:
     def test_chat_syllabus_returns_200_and_content(self, client: TestClient):
         r = client.post(
             "/api/v1/chat",
-            json={"message": "What is the syllabus?"},
+            json={"message": "What is the syllabus?", "user_id": "test-user"},
         )
         assert r.status_code == 200
         data = r.json()
@@ -51,7 +51,7 @@ class TestChatEndpoint:
     def test_chat_admin_returns_deadlines_or_policies(self, client: TestClient):
         r = client.post(
             "/api/v1/chat",
-            json={"message": "When are the assignment deadlines?"},
+            json={"message": "When are the assignment deadlines?", "user_id": "test-user"},
         )
         assert r.status_code == 200
         data = r.json()
@@ -62,7 +62,7 @@ class TestChatEndpoint:
     def test_chat_topic_returns_explanation(self, client: TestClient):
         r = client.post(
             "/api/v1/chat",
-            json={"message": "Explain what a variable is"},
+            json={"message": "Explain what a variable is", "user_id": "test-user"},
         )
         assert r.status_code == 200
         data = r.json()
@@ -72,7 +72,7 @@ class TestChatEndpoint:
     def test_chat_unknown_intent_returns_fallback(self, client: TestClient):
         r = client.post(
             "/api/v1/chat",
-            json={"message": "hello world"},
+            json={"message": "hello world", "user_id": "test-user"},
         )
         assert r.status_code == 200
         data = r.json()
@@ -82,7 +82,7 @@ class TestChatEndpoint:
     def test_chat_accepts_session_id(self, client: TestClient):
         r = client.post(
             "/api/v1/chat",
-            json={"message": "syllabus?", "session_id": "sess-123"},
+            json={"message": "syllabus?", "session_id": "sess-123", "user_id": "test-user"},
         )
         assert r.status_code == 200
         assert "content" in r.json()
@@ -90,19 +90,27 @@ class TestChatEndpoint:
     def test_chat_empty_message_returns_400(self, client: TestClient):
         r = client.post(
             "/api/v1/chat",
-            json={"message": ""},
+            json={"message": "", "user_id": "test-user"},
         )
         assert r.status_code == 422  # Pydantic validation: min_length=1
 
     def test_chat_missing_message_returns_422(self, client: TestClient):
-        r = client.post("/api/v1/chat", json={})
+        r = client.post("/api/v1/chat", json={"user_id": "test-user"})
+        assert r.status_code == 422
+
+    def test_chat_missing_user_id_returns_422(self, client: TestClient):
+        r = client.post("/api/v1/chat", json={"message": "hello"})
         assert r.status_code == 422
 
     def test_chat_quiz_intent_routes_to_quiz_agent(self, client: TestClient):
         """7.4: POST /api/v1/chat with quiz-intent message; assert Orchestrator routes to Quiz Agent."""
         r = client.post(
             "/api/v1/chat",
-            json={"message": "I want to start a quiz on algebra", "session_id": "sess-quiz-route"},
+            json={
+                "message": "I want to start a quiz on algebra",
+                "session_id": "sess-quiz-route",
+                "user_id": "test-user",
+            },
         )
         assert r.status_code == 200
         data = r.json()
@@ -116,7 +124,11 @@ class TestChatEndpoint:
         """7.4: POST /api/v1/chat with concept-test intent; assert routing to Concept Test agent."""
         r = client.post(
             "/api/v1/chat",
-            json={"message": "Start a concept test on calculus", "session_id": "sess-ct-route"},
+            json={
+                "message": "Start a concept test on calculus",
+                "session_id": "sess-ct-route",
+                "user_id": "test-user",
+            },
         )
         assert r.status_code == 200
         data = r.json()
@@ -134,7 +146,7 @@ class TestLoggingFlow:
         caplog.set_level("INFO")
         r = client.post(
             "/api/v1/chat",
-            json={"message": "What is the syllabus?"},
+            json={"message": "What is the syllabus?", "user_id": "test-user"},
         )
         assert r.status_code == 200
         joined = "\n".join(rec.getMessage() for rec in caplog.records)
@@ -147,7 +159,7 @@ class TestLoggingFlow:
         caplog.set_level("INFO")
         r = client.post(
             "/api/v1/chat",
-            json={"message": "hello world"},
+            json={"message": "hello world", "user_id": "test-user"},
         )
         assert r.status_code == 200
         joined = "\n".join(rec.getMessage() for rec in caplog.records)

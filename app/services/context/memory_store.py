@@ -43,7 +43,7 @@ class MemoryStore:
             self._sessions[session_id] = {}
         self._sessions[session_id].update(data)
 
-    def append_message(self, session_id: str, role: str, content: str) -> None:
+    def append_message(self, session_id: str, user_id: str, role: str, content: str) -> None:
         if session_id not in self._history:
             self._history[session_id] = []
         self._history[session_id].append({"role": role, "content": content})

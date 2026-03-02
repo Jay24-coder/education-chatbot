@@ -20,7 +20,7 @@ class TestOrchestratorAgentRouteRequest:
             context_store=memory_store,
             tracer=tracer,
         )
-        req = UserRequest(message="What is the syllabus?")
+        req = UserRequest(message="What is the syllabus?", user_id="test-user")
         resp = await orch.route_request(req)
         assert resp.success is True
         assert resp.agent_id == "syllabus"
@@ -35,7 +35,7 @@ class TestOrchestratorAgentRouteRequest:
             context_store=memory_store,
             tracer=tracer,
         )
-        req = UserRequest(message="What are the deadlines?")
+        req = UserRequest(message="What are the deadlines?", user_id="test-user")
         resp = await orch.route_request(req)
         assert resp.success is True
         assert resp.agent_id == "administration"
@@ -49,7 +49,7 @@ class TestOrchestratorAgentRouteRequest:
             context_store=memory_store,
             tracer=tracer,
         )
-        req = UserRequest(message="Explain what a variable is")
+        req = UserRequest(message="Explain what a variable is", user_id="test-user")
         resp = await orch.route_request(req)
         assert resp.success is True
         assert resp.agent_id == "topic_expert"
@@ -63,7 +63,7 @@ class TestOrchestratorAgentRouteRequest:
             context_store=memory_store,
             tracer=tracer,
         )
-        req = UserRequest(message="hello world")
+        req = UserRequest(message="hello world", user_id="test-user")
         resp = await orch.route_request(req)
         assert resp.success is True
         assert resp.agent_id == "orchestrator"
@@ -79,7 +79,7 @@ class TestOrchestratorAgentRouteRequest:
             context_store=memory_store,
             tracer=tracer,
         )
-        req = UserRequest(message="   ")
+        req = UserRequest(message="   ", user_id="test-user")
         with pytest.raises(ValidationError) as exc_info:
             await orch.route_request(req)
         assert exc_info.value.code == "EMPTY_MESSAGE"
@@ -93,7 +93,7 @@ class TestOrchestratorAgentRouteRequest:
             context_store=memory_store,
             tracer=tracer,
         )
-        req = UserRequest(message="syllabus?", correlation_id="corr-123")
+        req = UserRequest(message="syllabus?", correlation_id="corr-123", user_id="test-user")
         resp = await orch.route_request(req)
         assert resp.metadata.get("correlation_id") == "corr-123"
 

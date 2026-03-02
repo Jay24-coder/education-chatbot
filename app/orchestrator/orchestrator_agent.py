@@ -203,8 +203,9 @@ class OrchestratorAgent:
                     _fallback_response(correlation_id, self._fallback_message),
                 ])
                 if self._context_manager and request.session_id:
-                    self._context_manager.persist_turn(
+                    await self._context_manager.persist_turn_strict(
                         request.session_id,
+                        request.user_id,
                         request.message,
                         fallback.content,
                         correlation_id=correlation_id,
@@ -247,8 +248,9 @@ class OrchestratorAgent:
             )
             result = _aggregate_responses([response])
             if self._context_manager and session_id:
-                self._context_manager.persist_turn(
+                await self._context_manager.persist_turn_strict(
                     session_id,
+                    request.user_id,
                     request.message,
                     result.content,
                     correlation_id=correlation_id,

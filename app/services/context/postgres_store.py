@@ -53,14 +53,9 @@ class PostgresContextStore:
 
     # --- Conversation history ---
 
-    async def append_message(self, session_id: str, role: str, content: str) -> None:  # type: ignore[override]
-        # Use session_id as conversation identifier at this layer.
-        conv_id = int(session_id)
-
-        # Append to Postgres
-        await self._conversations_repo.append_message(conv_id, role, content)
-
-        # Invalidate or refresh cache
+    async def append_message(self, session_id: str, user_id: str, role: str, content: str) -> None:  # type: ignore[override]
+        conv = await self._conversations_repo.get_or_create_conversation(session_id, user_id)
+        await self._conversations_repo.append_message(conv.id, role, content)
         await redis_cache.invalidate_conversation(session_id)
 
     async def get_history(  # type: ignore[override]
@@ -73,18 +68,27 @@ class PostgresContextStore:
         if cached is not None:
             messages = cached
         else:
-            conv_id = int(session_id)
-            repo_limit = limit or 50
-            records = await self._conversations_repo.get_recent_messages(conv_id, limit=repo_limit)
-            messages = [
-                {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
-                for m in records
-            ]
-            await redis_cache.set_cached_conversation(
-                session_id,
-                messages,
-                ttl_sec=self._conversation_ttl_sec,
-            )
+            conv = await self._conversations_repo.get_by_session_id(session_id)
+            if conv is None:
+                messages = []
+            else:
+                repo_limit = limit or 50
+                records = await self._conversations_repo.get_recent_messages(
+                    conv.id, limit=repo_limit
+                )
+                messages = [
+                    {
+                        "role": m.role,
+                        "content": m.content,
+                        "created_at": m.created_at.isoformat(),
+                    }
+                    for m in records
+                ]
+                await redis_cache.set_cached_conversation(
+                    session_id,
+                    messages,
+                    ttl_sec=self._conversation_ttl_sec,
+                )
 
         if limit is not None:
             return messages[-limit:]

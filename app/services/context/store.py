@@ -35,7 +35,7 @@ class ContextStore(Protocol):
         """Set multiple keys in the session context."""
         ...
 
-    def append_message(self, session_id: str, role: str, content: str) -> None:
+    def append_message(self, session_id: str, user_id: str, role: str, content: str) -> None:
         """Append a message to conversation history for the session."""
         ...
 

@@ -61,7 +61,7 @@ class TestRetrievalFlow:
             context_store=store,
             tracer=NoOpTracer(),
         )
-        req = UserRequest(message="random gibberish xyz")
+        req = UserRequest(message="random gibberish xyz", user_id="test-user")
         intent = classify_intent(req.message)
         assert intent == Intent.UNKNOWN
         resp = await orch.route_request(req)
