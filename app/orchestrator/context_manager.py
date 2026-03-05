@@ -90,14 +90,18 @@ class ContextManager:
         """Append user and assistant messages to conversation history for the session."""
         if not session_id:
             return
-        user_result = self._store.append_message(session_id, user_id, "user", user_message)
+        user_result = self._store.append_message(
+            session_id, user_id, "user", user_message, correlation_id=correlation_id
+        )
         self._maybe_schedule(
             user_result,
             session_id=session_id,
             role="user",
             correlation_id=correlation_id,
         )
-        assistant_result = self._store.append_message(session_id, user_id, "assistant", assistant_content)
+        assistant_result = self._store.append_message(
+            session_id, user_id, "assistant", assistant_content, correlation_id=correlation_id
+        )
         self._maybe_schedule(
             assistant_result,
             session_id=session_id,
@@ -124,12 +128,18 @@ class ContextManager:
             return
 
         try:
-            user_result = self._store.append_message(session_id, user_id, "user", user_message)
+            user_result = self._store.append_message(
+                session_id, user_id, "user", user_message, correlation_id=correlation_id
+            )
             if inspect.isawaitable(user_result):
                 await user_result
 
             assistant_result = self._store.append_message(
-                session_id, user_id, "assistant", assistant_content
+                session_id,
+                user_id,
+                "assistant",
+                assistant_content,
+                correlation_id=correlation_id,
             )
             if inspect.isawaitable(assistant_result):
                 await assistant_result

@@ -5,6 +5,10 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
+
+# Alembic
+
 
 # Virtual environments
 .venv

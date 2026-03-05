@@ -17,11 +17,15 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id INTEGER      NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     role            VARCHAR(32)  NOT NULL,
     content         TEXT         NOT NULL,
+    correlation_id  VARCHAR(255) NULL,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id_created_at
     ON messages (conversation_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_messages_correlation_id
+    ON messages (correlation_id) WHERE correlation_id IS NOT NULL;
 
 -- Jobs: async work items (e.g. code_execution, topic_search)
 CREATE TABLE IF NOT EXISTS jobs (

@@ -53,9 +53,19 @@ class PostgresContextStore:
 
     # --- Conversation history ---
 
-    async def append_message(self, session_id: str, user_id: str, role: str, content: str) -> None:  # type: ignore[override]
+    async def append_message(
+        self,
+        session_id: str,
+        user_id: str,
+        role: str,
+        content: str,
+        *,
+        correlation_id: str | None = None,
+    ) -> None:  # type: ignore[override]
         conv = await self._conversations_repo.get_or_create_conversation(session_id, user_id)
-        await self._conversations_repo.append_message(conv.id, role, content)
+        await self._conversations_repo.append_message(
+            conv.id, role, content, correlation_id=correlation_id
+        )
         await redis_cache.invalidate_conversation(session_id)
 
     async def get_history(  # type: ignore[override]

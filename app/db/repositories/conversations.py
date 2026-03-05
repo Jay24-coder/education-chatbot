@@ -24,6 +24,7 @@ class MessageRecord:
     conversation_id: int
     role: str
     content: str
+    correlation_id: Optional[str]
     created_at: Any
 
 
@@ -133,12 +134,14 @@ class ConversationsRepository:
         conversation_id: int,
         role: str,
         content: str,
+        *,
+        correlation_id: Optional[str] = None,
     ) -> MessageRecord:
         query = text(
             """
-            INSERT INTO messages (conversation_id, role, content)
-            VALUES (:conversation_id, :role, :content)
-            RETURNING id, conversation_id, role, content, created_at
+            INSERT INTO messages (conversation_id, role, content, correlation_id)
+            VALUES (:conversation_id, :role, :content, :correlation_id)
+            RETURNING id, conversation_id, role, content, correlation_id, created_at
             """
         )
         async with self._engine.begin() as conn:
@@ -149,6 +152,7 @@ class ConversationsRepository:
                         "conversation_id": conversation_id,
                         "role": role,
                         "content": content,
+                        "correlation_id": correlation_id,
                     },
                 )
             ).one()
@@ -158,6 +162,7 @@ class ConversationsRepository:
             conversation_id=row.conversation_id,
             role=row.role,
             content=row.content,
+            correlation_id=row.correlation_id,
             created_at=row.created_at,
         )
 
@@ -184,6 +189,40 @@ class ConversationsRepository:
             updated_at=row.updated_at,
         )
 
+    async def list_for_user(
+        self,
+        user_id: str,
+        *,
+        limit: int = 50,
+    ) -> List[ConversationRecord]:
+        """Return recent conversations for a user, ordered by most recently updated."""
+        query = text(
+            """
+            SELECT id, session_id, user_id, created_at, updated_at
+            FROM conversations
+            WHERE user_id = :user_id
+            ORDER BY updated_at DESC
+            LIMIT :limit
+            """
+        )
+        async with self._engine.connect() as conn:
+            result = await conn.execute(
+                query,
+                {"user_id": user_id, "limit": limit},
+            )
+            rows = result.fetchall()
+
+        return [
+            ConversationRecord(
+                id=row.id,
+                session_id=row.session_id,
+                user_id=row.user_id,
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
+
     async def get_recent_messages(
         self,
         conversation_id: int,
@@ -191,7 +230,7 @@ class ConversationsRepository:
     ) -> List[MessageRecord]:
         query = text(
             """
-            SELECT id, conversation_id, role, content, created_at
+            SELECT id, conversation_id, role, content, correlation_id, created_at
             FROM messages
             WHERE conversation_id = :conversation_id
             ORDER BY created_at DESC
@@ -214,6 +253,7 @@ class ConversationsRepository:
                 conversation_id=row.conversation_id,
                 role=row.role,
                 content=row.content,
+                correlation_id=row.correlation_id,
                 created_at=row.created_at,
             )
             for row in rows

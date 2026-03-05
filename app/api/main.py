@@ -6,7 +6,14 @@ from fastapi.responses import JSONResponse
 from app.api.middleware.correlation import CorrelationIdMiddleware
 from app.api.middleware.logging_mw import LoggingMiddleware
 from app.api.middleware.ratelimit import RateLimitMiddleware
-from app.api.routers import assessment, chat, health, problem_solving, visualization
+from app.api.routers import (
+    assessment,
+    chat,
+    conversations,
+    health,
+    problem_solving,
+    visualization,
+)
 from app.observability.logging import get_logger
 from app.utils.errors import (
     AgentError,
@@ -27,6 +34,7 @@ logger = get_logger(__name__)
 # OpenAPI tags for /docs grouping
 OPENAPI_TAGS = [
     {"name": "chat", "description": "Student-facing chat: send a message, get assistant response. Uses session_id for conversation context."},
+    {"name": "conversations", "description": "List conversations and retrieve message history for a user."},
     {"name": "health", "description": "Liveness and readiness probes for deployment; optional agent health check."},
     {"name": "assessment", "description": "Quiz and concept test start/answer, performance summary by user."},
     {"name": "visualization", "description": "Generate diagrams (Mermaid) or chart specs from a description."},
@@ -47,6 +55,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(chat.router, prefix="/api/v1")
+    app.include_router(conversations.router, prefix="/api/v1")
     app.include_router(assessment.router, prefix="/api/v1")
     app.include_router(visualization.router, prefix="/api/v1")
     app.include_router(problem_solving.router, prefix="/api/v1")
