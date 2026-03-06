@@ -6,12 +6,13 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.18.4",
+    "anthropic==0.84.0",
     "asyncpg>=0.31.0",
     "dotenv>=0.9.9",
     "fastapi>=0.129.0",
+    "google-genai==1.66.0",
     "httpx>=0.28.1",
     "langchain>=1.2.10",
-    "langgraph>=1.0.8",
     "openai>=2.21.0",
     "pillow>=12.1.1",
     "psycopg2-binary>=2.9.11",

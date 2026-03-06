@@ -49,10 +49,25 @@ def get_context_store() -> "ContextStore":
 @lru_cache(maxsize=1)
 def get_llm_provider() -> "LLMProvider | None":
     """Return LLM provider if configured (e.g. API key set), else None."""
-    if not getattr(settings, "llm_api_key", None) or not settings.llm_api_key.strip():
-        return None
-    from app.services.llm.openai_provider import OpenAIProvider
-    return OpenAIProvider()
+    provider = (getattr(settings, "llm_provider", None) or "openai").strip().lower()
+
+    if provider in {"openai"}:
+        if not settings.llm_api_key.strip():
+            return None
+        from app.services.llm.openai_provider import OpenAIProvider
+
+        return OpenAIProvider()
+
+    if provider in {"google", "gemini"}:
+        api_key = (settings.google_api_key or settings.llm_api_key).strip()
+        if not api_key:
+            return None
+        from app.services.llm.google_provider import GoogleProvider
+
+        return GoogleProvider(api_key=api_key)
+
+    # Unknown provider: keep app running without LLM configured.
+    return None
 
 
 @lru_cache(maxsize=1)

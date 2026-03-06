@@ -14,6 +14,7 @@ from app.api.routers import (
     problem_solving,
     visualization,
 )
+from app.config.settings import settings
 from app.observability.logging import get_logger
 from app.utils.errors import (
     AgentError,
@@ -49,6 +50,24 @@ def create_app() -> FastAPI:
         version="1.0.0",
         openapi_tags=OPENAPI_TAGS,
     )
+
+    @app.on_event("startup")
+    async def log_llm_startup_config() -> None:
+        provider = (getattr(settings, "llm_provider", None) or "openai").strip().lower()
+        model_id = getattr(settings, "model_id", "") or ""
+
+        enabled = False
+        if provider in {"openai"}:
+            enabled = bool(getattr(settings, "llm_api_key", "").strip())
+        elif provider in {"google", "gemini"}:
+            enabled = bool((getattr(settings, "google_api_key", "") or getattr(settings, "llm_api_key", "")).strip())
+
+        logger.info(
+            "llm_startup_config",
+            llm_provider=provider,
+            model=model_id,
+            enabled=enabled,
+        )
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(CorrelationIdMiddleware)

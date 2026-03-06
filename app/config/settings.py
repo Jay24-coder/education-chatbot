@@ -1,5 +1,6 @@
 """Application configuration using Pydantic Settings."""
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,8 +48,9 @@ class Settings(BaseSettings):
 
     # LLM
     llm_provider: str = "openai"
-    llm_api_key: str = ""
-    model_id: str = "gpt-4o-mini"
+    llm_api_key: str = Field(default="", validation_alias=AliasChoices("LLM_API_KEY", "OPENAI_API_KEY"))
+    google_api_key: str = Field(default="", validation_alias=AliasChoices("GOOGLE_API_KEY", "GEMINI_API_KEY"))
+    model_id: str = Field(default="gpt-4o-mini", validation_alias=AliasChoices("MODEL_ID", "LLM_MODEL"))
 
     # Storage (optional)
     storage_bucket: str = ""
