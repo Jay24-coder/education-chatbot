@@ -92,11 +92,19 @@ def get_orchestrator() -> OrchestratorAgent:
     context_manager = get_context_manager()
     tracer = NoOpTracer()
     registry = get_agent_registry()
+    llm_provider = get_llm_provider()
+    intent_mode = (getattr(settings, "intent_detection_mode", None) or "keyword").strip().lower()
+    intent_model_id = (getattr(settings, "intent_model_id", None) or "").strip() or settings.model_id
+    intent_timeout = float(getattr(settings, "intent_llm_timeout_seconds", 3.0) or 3.0)
     return OrchestratorAgent(
         registry=registry,
         context_store=store,
         tracer=tracer,
         context_manager=context_manager,
+        llm_provider=llm_provider,
+        intent_detection_mode=intent_mode,
+        intent_model_id=intent_model_id,
+        intent_llm_timeout_seconds=intent_timeout,
     )
 
 

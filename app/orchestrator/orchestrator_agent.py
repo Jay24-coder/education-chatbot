@@ -4,6 +4,7 @@ import re
 from typing import Any, TYPE_CHECKING
 
 from app.observability.logging import get_logger
+from app.orchestrator.intent_classifier import classify_intent_llm
 from app.orchestrator.policies import with_timeout
 from app.orchestrator.routing import select_agent
 from app.orchestrator.types import AgentRequest, AgentResponse, Intent, UserRequest
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from app.orchestrator.registry import AgentRegistry
     from app.orchestrator.tracing import Tracer
     from app.services.context.store import ContextStore
+    from app.services.llm.provider import LLMProvider
 
 logger = get_logger(__name__)
 
@@ -150,6 +152,10 @@ class OrchestratorAgent:
         context_manager: "ContextManager | None" = None,
         agent_timeout_seconds: float = 30.0,
         fallback_message: str = DEFAULT_FALLBACK_MESSAGE,
+        llm_provider: "LLMProvider | None" = None,
+        intent_detection_mode: str = "keyword",
+        intent_model_id: str | None = None,
+        intent_llm_timeout_seconds: float = 3.0,
     ) -> None:
         self._registry = registry
         self._context_store = context_store
@@ -157,6 +163,10 @@ class OrchestratorAgent:
         self._context_manager = context_manager
         self._agent_timeout_seconds = agent_timeout_seconds
         self._fallback_message = fallback_message
+        self._llm_provider = llm_provider
+        self._intent_detection_mode = (intent_detection_mode or "keyword").strip().lower()
+        self._intent_model_id = intent_model_id
+        self._intent_llm_timeout_seconds = float(intent_llm_timeout_seconds or 0.0) or 3.0
 
     def all_agents(self) -> list["BaseAgent"]:
         """Return all registered agents (e.g. for health checks)."""
@@ -181,13 +191,29 @@ class OrchestratorAgent:
         span = self._tracer.start_span("orchestrator.route", correlation_id=correlation_id)
         try:
             span.set_attribute("message_length", len(request.message))
-            intent = classify_intent(request.message)
+            intent_source = "keyword"
+            intent = Intent.UNKNOWN
+            if self._intent_detection_mode == "llm_first" and self._llm_provider is not None:
+                intent_source = "llm"
+                intent = await classify_intent_llm(
+                    request.message,
+                    self._llm_provider,
+                    model=self._intent_model_id,
+                    timeout_seconds=self._intent_llm_timeout_seconds,
+                )
+                if intent == Intent.UNKNOWN:
+                    intent_source = "keyword"
+                    intent = classify_intent(request.message)
+            else:
+                intent = classify_intent(request.message)
             span.set_attribute("intent", intent.value)
+            span.set_attribute("intent_source", intent_source)
             logger.info(
                 "orchestrator_intent_classified",
                 correlation_id=correlation_id,
                 session_id=request.session_id,
                 intent=intent.value,
+                intent_source=intent_source,
             )
 
             agent: "BaseAgent | None" = select_agent(self._registry, intent)

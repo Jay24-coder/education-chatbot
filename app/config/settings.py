@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     google_api_key: str = Field(default="", validation_alias=AliasChoices("GOOGLE_API_KEY", "GEMINI_API_KEY"))
     model_id: str = Field(default="gpt-4o-mini", validation_alias=AliasChoices("MODEL_ID", "LLM_MODEL"))
 
+    # Intent detection (routing)
+    intent_detection_mode: str = Field(default="keyword", validation_alias=AliasChoices("INTENT_DETECTION_MODE"))
+    intent_model_id: str = Field(default="", validation_alias=AliasChoices("INTENT_MODEL_ID"))
+    intent_llm_timeout_seconds: float = Field(default=3.0, validation_alias=AliasChoices("INTENT_LLM_TIMEOUT_SECONDS"))
+
     # Storage (optional)
     storage_bucket: str = ""
     cdn_base_url: str = ""
