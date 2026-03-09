@@ -91,3 +91,59 @@ class OpenAIProvider:
                 error=str(e),
             )
             raise LLMProviderError(str(e), code="LLM_ERROR") from e
+
+    async def summarize_turn(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.0,
+        timeout_seconds: float | None = None,
+        max_chars: int = 512,
+    ) -> str | None:
+        """
+        Summarize a chat turn (e.g. user + assistant messages) into a short string.
+        Returns None if summarization fails so callers can safely fall back.
+        """
+        if not messages:
+            return None
+
+        parts = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "").strip()
+            if not content:
+                continue
+            parts.append(f"{role}: {content}")
+        if not parts:
+            return None
+
+        joined = "\n".join(parts)
+        if len(joined) > 4000:
+            joined = joined[-4000:]
+
+        prompt = (
+            "Summarize the following conversation turn between a user and an assistant "
+            "into a concise sentence or two that captures the key question and answer. "
+            "Avoid including personally identifiable information.\n\n"
+            f"{joined}\n\n"
+            "Summary:"
+        )
+
+        try:
+            raw = await self.complete(
+                prompt,
+                model=model,
+                temperature=temperature,
+                timeout_seconds=timeout_seconds,
+            )
+        except Exception as e:  # pragma: no cover - defensive
+            logger.error("llm_summary_failed", error=str(e))
+            return None
+
+        summary = (raw or "").strip()
+        if not summary:
+            return None
+        if len(summary) > max_chars:
+            summary = summary[: max_chars - 1].rstrip() + "…"
+        return summary

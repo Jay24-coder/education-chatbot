@@ -9,6 +9,7 @@ from app.utils.errors import OrchestratorError
 
 if TYPE_CHECKING:
     from app.services.context.store import ContextStore
+    from app.services.llm.provider import LLMProvider
 
 
 logger = get_logger(__name__)
@@ -20,8 +21,9 @@ class ContextManager:
     Use persist_turn() after each chat turn so conversation context persists across requests.
     """
 
-    def __init__(self, store: "ContextStore") -> None:
+    def __init__(self, store: "ContextStore", llm_provider: "LLMProvider | None" = None) -> None:
         self._store = store
+        self._llm_provider = llm_provider
 
     def _maybe_schedule(
         self,
@@ -90,8 +92,32 @@ class ContextManager:
         """Append user and assistant messages to conversation history for the session."""
         if not session_id:
             return
+        summary: str | None = None
+        if self._llm_provider is not None:
+            try:
+                summary = asyncio.run(
+                    self._llm_provider.summarize_turn(
+                        [
+                            {"role": "user", "content": user_message},
+                            {"role": "assistant", "content": assistant_content},
+                        ]
+                    )
+                )
+            except Exception as e:  # pragma: no cover - defensive logging
+                logger.error(
+                    "summary_generation_failed",
+                    session_id=session_id or None,
+                    correlation_id=correlation_id,
+                    error=str(e),
+                    exc_info=True,
+                )
         user_result = self._store.append_message(
-            session_id, user_id, "user", user_message, correlation_id=correlation_id
+            session_id,
+            user_id,
+            "user",
+            user_message,
+            summary=None,
+            correlation_id=correlation_id,
         )
         self._maybe_schedule(
             user_result,
@@ -100,7 +126,12 @@ class ContextManager:
             correlation_id=correlation_id,
         )
         assistant_result = self._store.append_message(
-            session_id, user_id, "assistant", assistant_content, correlation_id=correlation_id
+            session_id,
+            user_id,
+            "assistant",
+            assistant_content,
+            summary=summary,
+            correlation_id=correlation_id,
         )
         self._maybe_schedule(
             assistant_result,
@@ -128,8 +159,30 @@ class ContextManager:
             return
 
         try:
+            summary: str | None = None
+            if self._llm_provider is not None:
+                try:
+                    summary = await self._llm_provider.summarize_turn(
+                        [
+                            {"role": "user", "content": user_message},
+                            {"role": "assistant", "content": assistant_content},
+                        ]
+                    )
+                except Exception as e:  # pragma: no cover - defensive logging
+                    logger.error(
+                        "summary_generation_failed",
+                        session_id=session_id or None,
+                        correlation_id=correlation_id,
+                        error=str(e),
+                        exc_info=True,
+                    )
             user_result = self._store.append_message(
-                session_id, user_id, "user", user_message, correlation_id=correlation_id
+                session_id,
+                user_id,
+                "user",
+                user_message,
+                summary=None,
+                correlation_id=correlation_id,
             )
             if inspect.isawaitable(user_result):
                 await user_result
@@ -139,6 +192,7 @@ class ContextManager:
                 user_id,
                 "assistant",
                 assistant_content,
+                summary=summary,
                 correlation_id=correlation_id,
             )
             if inspect.isawaitable(assistant_result):

@@ -60,11 +60,16 @@ class PostgresContextStore:
         role: str,
         content: str,
         *,
+        summary: str | None = None,
         correlation_id: str | None = None,
     ) -> None:  # type: ignore[override]
         conv = await self._conversations_repo.get_or_create_conversation(session_id, user_id)
         await self._conversations_repo.append_message(
-            conv.id, role, content, correlation_id=correlation_id
+            conv.id,
+            role,
+            content,
+            summary=summary,
+            correlation_id=correlation_id,
         )
         await redis_cache.invalidate_conversation(session_id)
 
@@ -88,9 +93,10 @@ class PostgresContextStore:
                 )
                 messages = [
                     {
-                        "role": m.role,
-                        "content": m.content,
-                        "created_at": m.created_at.isoformat(),
+                    "role": m.role,
+                    "content": m.content,
+                    "summary": m.summary,
+                    "created_at": m.created_at.isoformat(),
                     }
                     for m in records
                 ]

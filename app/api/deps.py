@@ -72,8 +72,8 @@ def get_llm_provider() -> "LLMProvider | None":
 
 @lru_cache(maxsize=1)
 def get_context_manager() -> ContextManager:
-    """Return ContextManager wrapping the shared ContextStore."""
-    return ContextManager(get_context_store())
+    """Return ContextManager wrapping the shared ContextStore and LLM provider (for summaries)."""
+    return ContextManager(get_context_store(), llm_provider=get_llm_provider())
 
 
 @lru_cache(maxsize=1)

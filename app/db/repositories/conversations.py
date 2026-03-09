@@ -8,6 +8,11 @@ from typing import Any, List, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.observability.logging import get_logger
+
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class ConversationRecord:
@@ -24,6 +29,7 @@ class MessageRecord:
     conversation_id: int
     role: str
     content: str
+    summary: Optional[str]
     correlation_id: Optional[str]
     created_at: Any
 
@@ -135,13 +141,14 @@ class ConversationsRepository:
         role: str,
         content: str,
         *,
+        summary: Optional[str] = None,
         correlation_id: Optional[str] = None,
     ) -> MessageRecord:
         query = text(
             """
-            INSERT INTO messages (conversation_id, role, content, correlation_id)
-            VALUES (:conversation_id, :role, :content, :correlation_id)
-            RETURNING id, conversation_id, role, content, correlation_id, created_at
+            INSERT INTO messages (conversation_id, role, content, summary, correlation_id)
+            VALUES (:conversation_id, :role, :content, :summary, :correlation_id)
+            RETURNING id, conversation_id, role, content, summary, correlation_id, created_at
             """
         )
         async with self._engine.begin() as conn:
@@ -152,16 +159,29 @@ class ConversationsRepository:
                         "conversation_id": conversation_id,
                         "role": role,
                         "content": content,
+                        "summary": summary,
                         "correlation_id": correlation_id,
                     },
                 )
             ).one()
+
+        logger.info(
+            "message_persisted",
+            conversation_id=conversation_id,
+            role=role,
+            has_summary_param=summary is not None,
+            has_summary_db=row.summary is not None,
+            summary_param_preview=(summary[:120] if summary else None),
+            summary_db_preview=(row.summary[:120] if row.summary else None),
+            correlation_id=correlation_id,
+        )
 
         return MessageRecord(
             id=row.id,
             conversation_id=row.conversation_id,
             role=row.role,
             content=row.content,
+            summary=row.summary,
             correlation_id=row.correlation_id,
             created_at=row.created_at,
         )
@@ -230,7 +250,7 @@ class ConversationsRepository:
     ) -> List[MessageRecord]:
         query = text(
             """
-            SELECT id, conversation_id, role, content, correlation_id, created_at
+            SELECT id, conversation_id, role, content, summary, correlation_id, created_at
             FROM messages
             WHERE conversation_id = :conversation_id
             ORDER BY created_at DESC
@@ -253,6 +273,7 @@ class ConversationsRepository:
                 conversation_id=row.conversation_id,
                 role=row.role,
                 content=row.content,
+                summary=row.summary,
                 correlation_id=row.correlation_id,
                 created_at=row.created_at,
             )
