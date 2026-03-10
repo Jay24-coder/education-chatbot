@@ -7,7 +7,6 @@ wheels/
 *.egg-info
 .pytest_cache/
 
-
 # Virtual environments
 .venv
 
@@ -15,10 +14,12 @@ wheels/
 Multi-Agent Educational System Design Plan.pdf
 *.docx
 *.docx#
-images/*
 phase1/
 phase2/
 phase3/
+Discussions/
+docs
+LINKEDIN_PROJECT_DESCRIPTION.md
 
 # Environment variables
 .env
