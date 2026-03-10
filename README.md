@@ -1,7 +1,7 @@
 ## Education Chatbot
 
 <p align="center">
-  <img src="images/logo.jpg" alt="Education Chatbot logo" width="160" />
+  <img src="images/logo.jpg" alt="Education Chatbot logo" width="320" />
 </p>
 
 An intelligent, multi-agent educational assistant. It handles informational queries (syllabus, administration, exams, topics), delivers adaptive assessments (quizzes, programming tests, verbal concept checks, viva/mock interviews), monitors student performance for faculty alerts, and guides problem-solving with guardrails to foster deep understanding and independent learning.
